@@ -1,0 +1,15 @@
+# Ignore everything
+*
+
+# But not these files/folders
+!.gitignore
+!Assets/
+!Assets/**
+!Packages/
+!Packages/**
+!ProjectSettings/
+!ProjectSettings/**
+
+# Exclude Assets/Thirdparty
+Assets/Thirdparty/
+Assets/Samples/
