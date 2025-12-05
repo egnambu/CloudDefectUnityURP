@@ -3,6 +3,16 @@ using Unity.Cinemachine;
 
 public class PilotTypeController : MonoBehaviour
 {
+        [Header("Debug (Read Only)")]
+    [SerializeField] private string currentStateName;
+    public IPilotState currentState;
+    public Vector3 velocity;
+    public bool isGrounded;
+    [SerializeField] float jumpBufferTime = 0.1f;
+    float jumpBufferCounter = 0f;
+    public float landingCooldown;
+    [HideInInspector] public float airborneGraceTime; // Prevents immediate ground detection after jumping
+
     [Header("Core Components")]
     public CharacterController controller;
     public Transform cam;
@@ -44,16 +54,6 @@ public class PilotTypeController : MonoBehaviour
     [HideInInspector] public bool jumpPressed;
     [HideInInspector] public bool launchHeld;
     [HideInInspector] public bool hoverHeld;
-
-    [Header("Debug (Read Only)")]
-    [SerializeField] private string currentStateName;
-    public IPilotState currentState;
-    public Vector3 velocity;
-    public bool isGrounded;
-    [SerializeField] float jumpBufferTime = 0.1f;
-    float jumpBufferCounter = 0f;
-    public float landingCooldown;
-    [HideInInspector] public float airborneGraceTime; // Prevents immediate ground detection after jumping
 
     [HideInInspector] public float smoothMoveX;
     [HideInInspector] public float smoothMoveY;
@@ -98,15 +98,18 @@ public class PilotTypeController : MonoBehaviour
     void Update()
     {
         ReadInput();
-
-        UpdateGroundedStatus();
         currentState?.Tick();
+        
+        if (landingCooldown > 0f)
+        {
+            landingCooldown -= Time.deltaTime;
+        }
     }
 
     void FixedUpdate()
     {
+        UpdateGroundedStatus();
         currentState?.FixedTick();
-        
     }
 
     void ReadInput()
@@ -137,11 +140,6 @@ public class PilotTypeController : MonoBehaviour
             groundLayerMask,
             QueryTriggerInteraction.Ignore
         );
-
-        if (landingCooldown > 0f)
-        {
-            landingCooldown -= Time.fixedDeltaTime;
-        }
     }
 
     public void SetCameraPriority(CinemachineCamera activeCamera)
@@ -202,6 +200,22 @@ public class PilotTypeController : MonoBehaviour
         }
     }
 
+    public void TriggerLanding(float fallVelocity)
+    {
+        float fallingSpeed = Mathf.Abs(fallVelocity);
+        Debug.Log($"Falling Speed:" + fallingSpeed);
+        if (fallingSpeed > 10f)
+        {
+            animator.SetTrigger("HeavyLanding");
+            landingCooldown = 1.25f; // Heavy landing recovery time
+        }
+        else
+        {
+            animator.SetTrigger("LightLanding");
+            landingCooldown = 0.4f; // Light landing recovery time
+        }
+    }
+
         public void ApplyJumpForce()
     {
         velocity.y = 10f;
@@ -247,6 +261,7 @@ public class FreeWalkState : IPilotState
         ptC.controller.center = ptC.defaultCenter;
 
         ptC.SetCameraPriority(ptC.followCam);
+        Debug.Log("Entered: FreeWalkState");
     }
 
     public void Tick()
@@ -258,11 +273,25 @@ public class FreeWalkState : IPilotState
             return;
         }
 
+        // During landing recovery - no movement, no state transitions
+        if (ptC.landingCooldown > 0f)
+        {
+            // Force idle animation during landing
+            ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, 0f, Time.deltaTime * ptC.animatorLerpRate);
+            ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, 0f, Time.deltaTime * ptC.animatorLerpRate);
+            ptC.animator.SetFloat("MoveX", ptC.smoothMoveX);
+            ptC.animator.SetFloat("MoveY", ptC.smoothMoveY);
+            
+            // Only apply gravity, no horizontal movement
+            ptC.controller.Move(ptC.velocity * Time.deltaTime);
+            return;
+        }
+
         ptC.CheckStateTransitions();
 
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
 
-        isSprinting = ptC.launchHeld && ptC.isGrounded && ptC.landingCooldown <= 0f;
+        isSprinting = ptC.launchHeld && ptC.isGrounded;
 
         if (moveDir.sqrMagnitude > 0.01f)
         {
@@ -272,12 +301,6 @@ public class FreeWalkState : IPilotState
                 targetRotation,
                 ptC.turnSpeed * Time.deltaTime
             );
-        }
-
-        if (moveDir.sqrMagnitude > 0.01f)
-        {
-            float currentSpeed = isSprinting ? ptC.sprintSpeed : ptC.moveSpeed;
-            ptC.controller.Move(moveDir * currentSpeed * Time.deltaTime);
         }
 
         if (isSprinting && ptC.moveInput.magnitude > 0.01f)
@@ -295,12 +318,17 @@ public class FreeWalkState : IPilotState
         ptC.animator.SetFloat("MoveX", ptC.smoothMoveX);
         ptC.animator.SetFloat("MoveY", ptC.smoothMoveY);
 
+        // Movement in Tick for smooth high-framerate rendering
+        float currentSpeed = isSprinting ? ptC.sprintSpeed : ptC.moveSpeed;
+        Vector3 horizontalMove = moveDir * currentSpeed * Time.deltaTime;
+        Vector3 verticalMove = ptC.velocity * Time.deltaTime;
+        ptC.controller.Move(horizontalMove + verticalMove);
     }
 
     public void FixedTick()
     {
+        // Physics calculations only
         ptC.ApplyGravity();
-        ptC.controller.Move(ptC.velocity * Time.fixedDeltaTime);
         
         // Regenerate hover time while grounded
         ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
@@ -325,6 +353,7 @@ public class AimWalkState : IPilotState
 
     public void Enter()
     {
+        Debug.Log("Entered: AimWalkState");
         ptC.animator.SetBool("IsAiming", true);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsHovering", false);
@@ -344,11 +373,39 @@ public class AimWalkState : IPilotState
             return;
         }
 
+        // Declare camForward at method scope for reuse
+        Vector3 camForward;
+
+        // During landing recovery - no movement, no state transitions
+        if (ptC.landingCooldown > 0f)
+        {
+            // Still allow aim rotation during landing
+            camForward = ptC.cam.forward;
+            camForward.y = 0f;
+            if (camForward.sqrMagnitude > 0.01f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(camForward.normalized);
+                ptC.transform.rotation = Quaternion.Slerp(
+                    ptC.transform.rotation,
+                    targetRotation,
+                    Time.deltaTime * ptC.aimRotationSpeed
+                );
+            }
+            
+            // Force idle animation during landing
+            ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, 0f, Time.deltaTime * ptC.animatorLerpRate);
+            ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, 0f, Time.deltaTime * ptC.animatorLerpRate);
+            ptC.animator.SetFloat("AimWalkX", ptC.smoothMoveX);
+            ptC.animator.SetFloat("AimWalkY", ptC.smoothMoveY);
+            
+            // Only apply gravity, no horizontal movement
+            ptC.controller.Move(ptC.velocity * Time.deltaTime);
+            return;
+        }
+
         ptC.CheckStateTransitions();
 
-        Vector3 moveDir = ptC.GetCameraRelativeMovement();
-
-        Vector3 camForward = ptC.cam.forward;
+        camForward = ptC.cam.forward;
         camForward.y = 0f;
         if (camForward.sqrMagnitude > 0.01f)
         {
@@ -358,11 +415,6 @@ public class AimWalkState : IPilotState
                 targetRotation,
                 Time.deltaTime * ptC.aimRotationSpeed
             );
-        }
-
-        if (moveDir.sqrMagnitude > 0.01f)
-        {
-            ptC.controller.Move(moveDir * ptC.moveSpeed * Time.deltaTime);
         }
 
         Vector3 inputDir = new Vector3(ptC.moveInput.x, 0f, ptC.moveInput.y);
@@ -375,12 +427,17 @@ public class AimWalkState : IPilotState
         ptC.animator.SetFloat("AimWalkX", ptC.smoothMoveX);
         ptC.animator.SetFloat("AimWalkY", ptC.smoothMoveY);
 
+        // Movement in Tick for smooth high-framerate rendering
+        Vector3 moveDir = ptC.GetCameraRelativeMovement();
+        Vector3 horizontalMove = moveDir * ptC.moveSpeed * Time.deltaTime;
+        Vector3 verticalMove = ptC.velocity * Time.deltaTime;
+        ptC.controller.Move(horizontalMove + verticalMove);
     }
 
     public void FixedTick()
     {
+        // Physics calculations only
         ptC.ApplyGravity();
-        ptC.controller.Move(ptC.velocity * Time.fixedDeltaTime);
         
         // Regenerate hover time while grounded
         ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
@@ -406,6 +463,7 @@ public class JumpPilotState : IPilotState
 
     public void Enter()
     {
+        Debug.Log("Entered: JumpWalkState");
         hasAppliedJumpForce = false;
         ptC.animator.SetTrigger("Jump");
         ptC.airborneGraceTime = 0.2f; // Grace period to prevent immediate ground detection
@@ -416,9 +474,8 @@ public class JumpPilotState : IPilotState
 
     public void FixedTick()
     {
-        // Apply gravity while in jump state
+        // Physics calculations only - gravity accumulation
         ptC.velocity.y += ptC.gravity * Time.fixedDeltaTime;
-        ptC.controller.Move(ptC.velocity * Time.fixedDeltaTime);
     }
 
     public void Tick()
@@ -429,21 +486,22 @@ public class JumpPilotState : IPilotState
             ptC.airborneGraceTime -= Time.deltaTime;
         }
 
-        // Allow air control during jump
+        // Rotation
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
         if (moveDir.sqrMagnitude > 0.01f)
         {
-            // Rotate towards movement direction
             Quaternion targetRotation = Quaternion.LookRotation(moveDir);
             ptC.transform.rotation = Quaternion.RotateTowards(
                 ptC.transform.rotation,
                 targetRotation,
                 ptC.turnSpeed * 0.5f * Time.deltaTime
             );
-
-            // Apply horizontal air movement (reduced control in air)
-            ptC.controller.Move(moveDir * ptC.moveSpeed * 0.5f * Time.deltaTime);
         }
+
+        // Movement in Tick for smooth high-framerate rendering
+        Vector3 horizontalMove = moveDir * ptC.moveSpeed * 0.5f * Time.deltaTime;
+        Vector3 verticalMove = ptC.velocity * Time.deltaTime;
+        ptC.controller.Move(horizontalMove + verticalMove);
 
         // Check for hover transition (must have time remaining)
         if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
@@ -466,11 +524,9 @@ public class JumpPilotState : IPilotState
             ptC.ChangeState(ptC.FallPilotState);
             return;
         } 
-
-        
     }
 
-        public void Exit()
+    public void Exit()
     {
 
         ptC.animator.ResetTrigger("Jump");
@@ -491,7 +547,7 @@ public class FallPilotState : IPilotState
     public void Enter()
     {
         fallTime = 0f;
-
+        Debug.Log("Entered: FallWalkState");
         ptC.animator.SetBool("IsFalling", true);
         ptC.animator.SetBool("IsAiming", false);
         ptC.animator.SetBool("IsHovering", false);
@@ -508,26 +564,14 @@ public class FallPilotState : IPilotState
     public void Exit()
     {
         ptC.animator.SetBool("IsFalling", false);
-
-        // Trigger landing animations based on fall speed
-        float fallingSpeed = Mathf.Abs(ptC.velocity.y);
-        if (fallingSpeed > 10f)
-        {
-            ptC.animator.SetTrigger("HeavyLanding");
-            ptC.landingCooldown = 0.5f; // Heavy landing recovery time
-        }
-        else if (fallingSpeed > 2f)
-        {
-            ptC.animator.SetTrigger("LightLanding");
-            ptC.landingCooldown = 0.2f; // Light landing recovery time
-        }
+        // Note: Landing animations are now triggered by ground states on entry
+        // This prevents false landings when transitioning to hover
     }
 
     public void FixedTick()
     {
-        // Apply gravity
+        // Physics calculations only - gravity accumulation
         ptC.velocity.y += ptC.gravity * Time.fixedDeltaTime;
-        ptC.controller.Move(ptC.velocity * Time.fixedDeltaTime);
     }
 
     public void Tick()
@@ -540,21 +584,22 @@ public class FallPilotState : IPilotState
             ptC.airborneGraceTime -= Time.deltaTime;
         }
 
-        // Allow air control during fall
+        // Rotation
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
         if (moveDir.sqrMagnitude > 0.01f)
         {
-            // Rotate towards movement direction
             Quaternion targetRotation = Quaternion.LookRotation(moveDir);
             ptC.transform.rotation = Quaternion.RotateTowards(
                 ptC.transform.rotation,
                 targetRotation,
                 ptC.turnSpeed * 0.5f * Time.deltaTime
             );
-
-            // Apply horizontal air movement (reduced control in air)
-            ptC.controller.Move(moveDir * ptC.moveSpeed * 0.5f * Time.deltaTime);
         }
+
+        // Movement in Tick for smooth high-framerate rendering
+        Vector3 horizontalMove = moveDir * ptC.moveSpeed * 0.5f * Time.deltaTime;
+        Vector3 verticalMove = ptC.velocity * Time.deltaTime;
+        ptC.controller.Move(horizontalMove + verticalMove);
 
         // Check for hover transition (must have time remaining)
         if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
@@ -566,6 +611,9 @@ public class FallPilotState : IPilotState
         // Check for landing - only after grace period and with downward velocity
         if (ptC.isGrounded && ptC.airborneGraceTime <= 0f && ptC.velocity.y <= 0f)
         {
+            // Trigger landing animation before state change
+            ptC.TriggerLanding(ptC.velocity.y);
+            
             // Transition to appropriate ground state
             if (ptC.aimHeld)
                 ptC.ChangeState(ptC.AimWalkState);
@@ -590,6 +638,7 @@ public class HoverPilotState : IPilotState
 
     public void Enter()
     {
+        Debug.Log("Entered: HoverWalkState");
         hoverBobTimer = 0f;
         hasStabilized = false;
         stabilizeGraceTime = 0.15f; // Small grace period on entry
@@ -611,7 +660,7 @@ public class HoverPilotState : IPilotState
 
     public void FixedTick()
     {
-        // Decay velocity towards zero (creates smooth transition from falling/jumping)
+        // Physics calculations only - velocity decay
         float decayFactor = ptC.hoverVelocityDecayRate * Time.fixedDeltaTime;
         ptC.velocity.x = Mathf.MoveTowards(ptC.velocity.x, 0f, decayFactor);
         ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, decayFactor);
@@ -635,8 +684,6 @@ public class HoverPilotState : IPilotState
             float currentY = ptC.transform.position.y;
             ptC.velocity.y = (targetY - currentY) * 5f; // Smooth follow
         }
-
-        ptC.controller.Move(ptC.velocity * Time.fixedDeltaTime);
     }
 
     public void Tick()
@@ -651,32 +698,34 @@ public class HoverPilotState : IPilotState
         ptC.hoverTimeRemaining -= Time.deltaTime;
         ptC.hoverTimeRemaining = Mathf.Max(0f, ptC.hoverTimeRemaining);
 
-        // Get movement input
-        Vector3 moveDir = ptC.GetCameraRelativeMovement();
-
-        // Rotate towards movement direction
-        if (moveDir.sqrMagnitude > 0.01f)
+        // Rotation only in Tick - Face camera forward direction (like aim state)
+        Vector3 camForward = ptC.cam.forward;
+        camForward.y = 0f;
+        if (camForward.sqrMagnitude > 0.01f)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(moveDir);
-            ptC.transform.rotation = Quaternion.RotateTowards(
+            Quaternion targetRotation = Quaternion.LookRotation(camForward.normalized);
+            ptC.transform.rotation = Quaternion.Slerp(
                 ptC.transform.rotation,
                 targetRotation,
-                ptC.turnSpeed * 0.7f * Time.deltaTime
+                Time.deltaTime * ptC.aimRotationSpeed
             );
         }
 
-        // Apply horizontal movement
-        if (moveDir.sqrMagnitude > 0.01f)
-        {
-            ptC.controller.Move(moveDir * ptC.hoverMoveSpeed * Time.deltaTime);
-        }
+        // Update animator blend tree parameters (like aim state)
+        Vector3 inputDir = new Vector3(ptC.moveInput.x, 0f, ptC.moveInput.y);
+        Vector3 worldDir = ptC.cam.forward * inputDir.z + ptC.cam.right * inputDir.x;
+        Vector3 localDir = ptC.transform.InverseTransformDirection(worldDir);
 
-        // Update animator blend tree parameters
-        Vector3 localDir = ptC.transform.InverseTransformDirection(moveDir);
         ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, localDir.x, Time.deltaTime * ptC.animatorLerpRate);
         ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, localDir.z, Time.deltaTime * ptC.animatorLerpRate);
         ptC.animator.SetFloat("HoverX", ptC.smoothMoveX);
         ptC.animator.SetFloat("HoverY", ptC.smoothMoveY);
+
+        // Movement in Tick for smooth high-framerate rendering
+        Vector3 moveDir = ptC.GetCameraRelativeMovement();
+        Vector3 horizontalMove = moveDir * ptC.hoverMoveSpeed * Time.deltaTime;
+        Vector3 verticalMove = ptC.velocity * Time.deltaTime;
+        ptC.controller.Move(horizontalMove + verticalMove);
 
         // Exit conditions (only after grace period)
         if (stabilizeGraceTime <= 0f)
@@ -691,6 +740,9 @@ public class HoverPilotState : IPilotState
             // Exit if grounded (landed while hovering low)
             if (ptC.isGrounded && hasStabilized)
             {
+                // Trigger soft landing since hover slows descent
+                ptC.TriggerLanding(ptC.velocity.y);
+                
                 if (ptC.aimHeld)
                     ptC.ChangeState(ptC.AimWalkState);
                 else
