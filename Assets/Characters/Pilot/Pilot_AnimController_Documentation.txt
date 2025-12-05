@@ -1,0 +1,415 @@
+============================================================
+ANIMATOR CONTROLLER DOCUMENTATION
+Controller Name: Pilot_AnimController
+Asset Path: Assets/Characters/Pilot/SuperheroFlights/Pilot_AnimController.controller
+Generated: 12/5/2025 8:55:41 PM
+============================================================
+
+## PARAMETERS
+----------------------------------------
+Total Parameters: 15
+
+  - MoveX
+    Type: Float
+    Default: 0.00
+
+  - MoveY
+    Type: Float
+    Default: 0.00
+
+  - AimWalkX
+    Type: Float
+    Default: 0.00
+
+  - AimWalkY
+    Type: Float
+    Default: 0.00
+
+  - HoverX
+    Type: Float
+    Default: 0.00
+
+  - HoverY
+    Type: Float
+    Default: 0.00
+
+  - Jump
+    Type: Trigger
+    Default: (Trigger)
+
+  - LightLanding
+    Type: Trigger
+    Default: (Trigger)
+
+  - HeavyLanding
+    Type: Trigger
+    Default: (Trigger)
+
+  - IsFlying
+    Type: Bool
+    Default: False
+
+  - IsHovering
+    Type: Bool
+    Default: False
+
+  - Landing
+    Type: Trigger
+    Default: (Trigger)
+
+  - IsAiming
+    Type: Bool
+    Default: False
+
+  - IsFalling
+    Type: Bool
+    Default: False
+
+  - IsGrounded
+    Type: Bool
+    Default: False
+
+
+## LAYERS
+----------------------------------------
+Total Layers: 2
+
+### LAYER 0: "Movement"
+    Blending Mode: Override
+    Weight: 1
+    IK Pass: False
+    Sync Layer: None
+
+    STATE MACHINE: "Movement"
+    Default State: "Movement"
+
+    ANY STATE TRANSITIONS (1):
+        TRANSITION: "Any State" -> "Hover Start"
+            Has Exit Time: False
+            Has Fixed Duration: True
+            Duration: 0.461
+            Offset: 0.000
+            Interruption Source: None
+            Ordered Interruption: True
+            Can Transition To Self: True
+            CONDITIONS (1):
+              - IsHovering == true
+
+
+    STATES (1):
+
+        STATE: "Movement"
+            Tag: ""
+            Speed: 1 (Multiplier Param: None)
+            Cycle Offset: 0
+            Mirror: False (Param: None)
+            Write Default Values: True
+            Motion Type: Blend Tree
+            Blend Tree Name: "Blend Tree"
+            Blend Type: FreeformCartesian2D
+            Blend Parameter: "MoveX"
+            Blend Parameter Y: "MoveY"
+            Min Threshold: 0
+            Max Threshold: 1
+            Children (3):
+                - "TwinSword_Common_Idle" (Clip) @ Position: (0.00, 0.00)
+                - "TwinSword_Common_Run_Loop" (Clip) @ Position: (0.00, 1.00)
+                - "TwinSword_Common_Sprint" (Clip) @ Position: (0.00, 1.50)
+            TRANSITIONS (3):
+                TRANSITION: "Movement" -> "Aim Walk"
+                    Has Exit Time: False
+                    Has Fixed Duration: True
+                    Duration: 0.606
+                    Offset: 0.000
+                    Interruption Source: None
+                    Ordered Interruption: True
+                    Can Transition To Self: True
+                    CONDITIONS (1):
+                      - IsAiming == true
+
+                TRANSITION: "Movement" -> "Jump"
+                    Has Exit Time: False
+                    Has Fixed Duration: True
+                    Duration: 0.329
+                    Offset: 0.000
+                    Interruption Source: None
+                    Ordered Interruption: True
+                    Can Transition To Self: True
+                    CONDITIONS (1):
+                      - Jump == true
+
+                TRANSITION: "Movement" -> "Fall"
+                    Has Exit Time: False
+                    Has Fixed Duration: True
+                    Duration: 0.278
+                    Offset: 0.000
+                    Interruption Source: None
+                    Ordered Interruption: True
+                    Can Transition To Self: True
+                    CONDITIONS (1):
+                      - IsFalling == true
+
+
+    SUB-STATE MACHINES (3):
+        STATE MACHINE: "Aim Walk"
+        Default State: "Aim Blend Tree"
+
+        STATES (1):
+
+            STATE: "Aim Blend Tree"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Blend Tree
+                Blend Tree Name: "Blend Tree"
+                Blend Type: FreeformDirectional2D
+                Blend Parameter: "AimWalkX"
+                Blend Parameter Y: "AimWalkY"
+                Min Threshold: 0
+                Max Threshold: 1
+                Children (7):
+                    - "AS_Rifle_WalkFwd_Aim" (Clip) @ Position: (0.00, 1.00)
+                    - "AS_Rifle_WalkRight_Aim" (Clip) @ Position: (0.50, 0.50)
+                    - "AS_Rifle_WalkLeft_Aim" (Clip) @ Position: (-0.50, 0.50)
+                    - "AS_Rifle_WalkBwd_Aim" (Clip) @ Position: (0.00, -1.00)
+                    - "AS_Rifle_WalkRight_Aim" (Clip) @ Position: (0.50, -0.50)
+                    - "AS_Rifle_WalkLeft_Aim" (Clip) @ Position: (-0.50, -0.50)
+                    - "AS_Rifle_Aim" (Clip) @ Position: (0.00, 0.00)
+                TRANSITIONS (1):
+                    TRANSITION: "Aim Blend Tree" -> "Exit"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.573
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - IsAiming == false
+
+        STATE MACHINE: "Jump Machine"
+        Default State: "Jump"
+
+        ENTRY TRANSITIONS (1):
+            -> "Jump"
+
+        STATES (4):
+
+            STATE: "Jump"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Animation Clip
+                Clip Name: "TwinSword_Jump_Start"
+                Length: 0.83s
+                Frame Rate: 30 FPS
+                Looping: False
+                Legacy: False
+                TRANSITIONS (1):
+                    TRANSITION: "Jump" -> "Fall"
+                        Has Exit Time: True
+                        Exit Time: 0.000
+                        Has Fixed Duration: True
+                        Duration: 0.312
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS: (None - Exit Time Only)
+
+
+            STATE: "Light Land"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Animation Clip
+                Clip Name: "TwinSword_Jump_End"
+                Length: 0.35s
+                Frame Rate: 30 FPS
+                Looping: False
+                Legacy: False
+                TRANSITIONS (1):
+                    TRANSITION: "Light Land" -> "Movement"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.185
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - IsGrounded == false
+
+
+            STATE: "Fall"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Animation Clip
+                Clip Name: "TwinSword_Jump_Loop"
+                Length: 0.80s
+                Frame Rate: 30 FPS
+                Looping: True
+                Legacy: False
+                TRANSITIONS (4):
+                    TRANSITION: "Fall" -> "Light Land"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.086
+                        Offset: 0.004
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - LightLanding == true
+
+                    TRANSITION: "Fall" -> "Heavy Land"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.286
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - HeavyLanding == true
+
+                    TRANSITION: "Fall" -> "Fall"
+                        Has Exit Time: True
+                        Exit Time: 0.688
+                        Has Fixed Duration: True
+                        Duration: 0.250
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS: (None - Exit Time Only)
+
+                    TRANSITION: "Fall" -> "Exit"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.250
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - IsHovering == true
+
+
+            STATE: "Heavy Land"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Animation Clip
+                Clip Name: "A_SuperheroLanding_C"
+                Length: 2.00s
+                Frame Rate: 30 FPS
+                Looping: False
+                Legacy: False
+                TRANSITIONS (1):
+                    TRANSITION: "Heavy Land" -> "Movement"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.426
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - IsGrounded == false
+
+        STATE MACHINE: "Hover Machine"
+        Default State: "Hover Start"
+
+        STATES (2):
+
+            STATE: "Hover Start"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Animation Clip
+                Clip Name: "A_Flight_Hover_Start_B"
+                Length: 1.07s
+                Frame Rate: 30 FPS
+                Looping: False
+                Legacy: False
+                TRANSITIONS (1):
+                    TRANSITION: "Hover Start" -> "Hover Blend"
+                        Has Exit Time: True
+                        Exit Time: 0.000
+                        Has Fixed Duration: True
+                        Duration: 0.714
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS: (None - Exit Time Only)
+
+
+            STATE: "Hover Blend"
+                Tag: ""
+                Speed: 1 (Multiplier Param: None)
+                Cycle Offset: 0
+                Mirror: False (Param: None)
+                Write Default Values: True
+                Motion Type: Blend Tree
+                Blend Tree Name: "Blend Tree"
+                Blend Type: FreeformDirectional2D
+                Blend Parameter: "HoverX"
+                Blend Parameter Y: "HoverY"
+                Min Threshold: 0
+                Max Threshold: 1
+                Children (5):
+                    - "A_Flight_HoverMove_B_F_Add" (Clip) @ Position: (0.00, 1.00)
+                    - "A_Flight_HoverMove_B_L_Add" (Clip) @ Position: (-1.00, 0.00)
+                    - "A_Flight_HoverMove_B_B_Add" (Clip) @ Position: (0.00, -1.00)
+                    - "A_Flight_HoverMove_B_R_Add" (Clip) @ Position: (1.00, 0.00)
+                    - "A_Flight_HoverMove_A" (Clip) @ Position: (0.00, 0.00)
+
+### LAYER 1: "Aim"
+    Blending Mode: Override
+    Weight: 0
+    Avatar Mask: SK_Torso
+    IK Pass: False
+    Sync Layer: None
+
+    STATE MACHINE: "Aim"
+    Default State: "Aim Blend Tree"
+
+    STATES (1):
+
+        STATE: "Aim Blend Tree"
+            Tag: ""
+            Speed: 1 (Multiplier Param: None)
+            Cycle Offset: 0
+            Mirror: False (Param: None)
+            Write Default Values: True
+            Motion Type: Blend Tree
+            Blend Tree Name: "Blend Tree"
+            Blend Type: FreeformDirectional2D
+            Blend Parameter: "AimWalkX"
+            Blend Parameter Y: "AimWalkY"
+            Min Threshold: 0
+            Max Threshold: 1
+            Children (7):
+                - "AS_Rifle_WalkFwd_Aim" (Clip) @ Position: (0.00, 1.00)
+                - "AS_Rifle_WalkRight_Aim" (Clip) @ Position: (0.50, 0.50)
+                - "AS_Rifle_WalkLeft_Aim" (Clip) @ Position: (-0.50, 0.50)
+                - "AS_Rifle_WalkBwd_Aim" (Clip) @ Position: (0.00, -1.00)
+                - "AS_Rifle_WalkRight_Aim" (Clip) @ Position: (0.50, -0.50)
+                - "AS_Rifle_WalkLeft_Aim" (Clip) @ Position: (-0.50, -0.50)
+                - "AS_Rifle_Aim" (Clip) @ Position: (0.00, 0.00)
+

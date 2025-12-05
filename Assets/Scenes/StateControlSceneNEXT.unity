@@ -973,8 +973,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961739749}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.22975293, y: 0.000000028872195, z: -0.0000000068158004, w: 0.973249}
-  m_LocalPosition: {x: 0.6478772, y: 91.645004, z: -2.3834531}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.6478772, y: 90.394424, z: -2.5834532}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5499,6 +5499,15 @@ MonoBehaviour:
   hoverBobFrequency: 1.5
   hoverMoveSpeed: 4
   hoverTimeRemaining: 0
+  flightSpeed: 34
+  flightAcceleration: 8
+  pitchSpeed: 180
+  yawSpeed: 180
+  flightMaxDuration: 20
+  flightControllerHeight: 0.2
+  controllerPoint: {fileID: 1374873200}
+  meshRoot: {fileID: 1275071845912813992}
+  flightTimeRemaining: 0
   moveInput: {x: 0, y: 0}
   aimHeld: 0
   jumpPressed: 0

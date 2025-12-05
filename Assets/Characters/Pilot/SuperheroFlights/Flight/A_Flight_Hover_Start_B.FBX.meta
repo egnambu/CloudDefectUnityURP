@@ -38,16 +38,16 @@ ModelImporter:
       name: A_Flight_Hover_Start_B
       takeName: Unreal Take
       internalID: 8993902097722301239
-      firstFrame: 0
-      lastFrame: 45
+      firstFrame: 5
+      lastFrame: 21
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
       cycleOffset: 0
       loop: 0
       hasAdditiveReferencePose: 0
-      loopTime: 1
-      loopBlend: 1
+      loopTime: 0
+      loopBlend: 0
       loopBlendOrientation: 1
       loopBlendPositionY: 1
       loopBlendPositionXZ: 1

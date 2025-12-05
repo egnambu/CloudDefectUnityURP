@@ -48,6 +48,17 @@ public class PilotTypeController : MonoBehaviour
     public float hoverMoveSpeed = 4f; // Horizontal movement speed while hovering
     [HideInInspector] public float hoverTimeRemaining;
 
+    [Header("Flight Settings")]
+    public float flightSpeed = 34f;
+    public float flightAcceleration = 8f;
+    public float pitchSpeed = 180f;
+    public float yawSpeed = 180f;
+    public float flightMaxDuration = 20f;
+    public float flightControllerHeight = 0.2f;
+    public Transform controllerPoint; // Optional: point to center the small collider on
+    public Transform meshRoot; // For countering animation root motion during flight
+    [HideInInspector] public float flightTimeRemaining;
+
     [HideInInspector] public Pilot1 input;
     [HideInInspector] public Vector2 moveInput;
     [HideInInspector] public bool aimHeld;
@@ -66,6 +77,7 @@ public class PilotTypeController : MonoBehaviour
     public JumpPilotState JumpPilotState { get; private set; }
     public FallPilotState FallPilotState { get; private set; }
     public HoverPilotState HoverPilotState { get; private set; }
+    public FlightPilotState FlightPilotState { get; private set; }
 
     void Awake()
     {
@@ -79,6 +91,7 @@ public class PilotTypeController : MonoBehaviour
         JumpPilotState = new JumpPilotState(this);
         FallPilotState = new FallPilotState(this);
         HoverPilotState = new HoverPilotState(this);
+        FlightPilotState = new FlightPilotState(this);
     }
 
     void OnEnable() => input.Enable();
@@ -90,6 +103,7 @@ public class PilotTypeController : MonoBehaviour
         defaultHeight = controller.height;
         defaultCenter = controller.center;
         hoverTimeRemaining = hoverMaxDuration;
+        flightTimeRemaining = flightMaxDuration;
 
         if (animator != null) animator.applyRootMotion = false;
         ChangeState(FreeWalkState);
@@ -336,8 +350,9 @@ public class FreeWalkState : IPilotState
         // Physics calculations only
         ptC.ApplyGravity();
         
-        // Regenerate hover time while grounded
+        // Regenerate hover and flight time while grounded
         ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
+        ptC.flightTimeRemaining = Mathf.MoveTowards(ptC.flightTimeRemaining, ptC.flightMaxDuration, Time.fixedDeltaTime * 5f);
     }
 
     public void Exit()
@@ -445,8 +460,9 @@ public class AimWalkState : IPilotState
         // Physics calculations only
         ptC.ApplyGravity();
         
-        // Regenerate hover time while grounded
+        // Regenerate hover and flight time while grounded
         ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
+        ptC.flightTimeRemaining = Mathf.MoveTowards(ptC.flightTimeRemaining, ptC.flightMaxDuration, Time.fixedDeltaTime * 5f);
     }
 
     public void Exit()
@@ -508,6 +524,13 @@ public class JumpPilotState : IPilotState
         Vector3 horizontalMove = moveDir * ptC.moveSpeed * 0.5f * Time.deltaTime;
         Vector3 verticalMove = ptC.velocity * Time.deltaTime;
         ptC.controller.Move(horizontalMove + verticalMove);
+
+        // Check for flight transition (launch held and has time remaining)
+        if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+        {
+            ptC.ChangeState(ptC.FlightPilotState);
+            return;
+        }
 
         // Check for hover transition (must have time remaining)
         if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
@@ -607,6 +630,13 @@ public class FallPilotState : IPilotState
         Vector3 verticalMove = ptC.velocity * Time.deltaTime;
         ptC.controller.Move(horizontalMove + verticalMove);
 
+        // Check for flight transition (launch held and has time remaining)
+        if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+        {
+            ptC.ChangeState(ptC.FlightPilotState);
+            return;
+        }
+
         // Check for hover transition (must have time remaining)
         if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
         {
@@ -645,7 +675,7 @@ public class HoverPilotState : IPilotState
 
     public void Enter()
     {
-        Debug.Log("Entered: HoverWalkState");
+        Debug.Log("Entered: HoverState");
         hoverBobTimer = 0f;
         hasStabilized = false;
         stabilizeGraceTime = 0.15f; // Small grace period on entry
@@ -655,7 +685,7 @@ public class HoverPilotState : IPilotState
         ptC.animator.SetBool("IsHovering", true);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsAiming", false);
-
+        ptC.animator.SetTrigger("HoverStart");
         ptC.SetCameraPriority(ptC.aimCam);
     }
 
@@ -664,6 +694,7 @@ public class HoverPilotState : IPilotState
         ptC.animator.SetBool("IsHovering", false);
         ptC.animator.SetFloat("HoverX", 0f);
         ptC.animator.SetFloat("HoverY", 0f);
+        ptC.animator.ResetTrigger("HoverStart");
         // Reset aim layer weight on exit
         ptC.animator.SetLayerWeight(1, 0f);
     }
@@ -764,6 +795,214 @@ public class HoverPilotState : IPilotState
                     ptC.ChangeState(ptC.FreeWalkState);
                 return;
             }
+        }
+    }
+}
+
+public class FlightPilotState : IPilotState
+{
+    private readonly PilotTypeController ptC;
+    private float currentFlightSpeed;
+    private float currentPitch;
+    private float currentYaw;
+    private float stabilizeGraceTime;
+    private float landRotateSpeed = 6f;
+    private float landingCheckDistance = 1.2f;
+    private bool isLanding;
+
+    public FlightPilotState(PilotTypeController controller)
+    {
+        ptC = controller;
+    }
+
+    public void Enter()
+    {
+        Debug.Log("Entered: FlightPilotState");
+        currentFlightSpeed = 0f;
+        currentPitch = 0f;
+        currentYaw = 0f;
+        stabilizeGraceTime = 0.15f;
+        isLanding = false;
+
+        // Resize controller for flight (smaller collider)
+        ptC.controller.height = ptC.flightControllerHeight;
+        if (ptC.controllerPoint != null)
+        {
+            ptC.controller.center = ptC.transform.InverseTransformPoint(ptC.controllerPoint.position);
+        }
+        else
+        {
+            ptC.controller.center = new Vector3(0, 0.1f, 0);
+        }
+
+        // Set animator states
+        ptC.animator.SetBool("IsFlying", true);
+        ptC.animator.SetBool("IsFalling", false);
+        ptC.animator.SetBool("IsHovering", false);
+        ptC.animator.SetBool("IsAiming", false);
+        ptC.animator.SetTrigger("FlightStart");
+        
+        // Clear velocity - flight controls movement directly
+        ptC.velocity = Vector3.zero;
+
+        ptC.SetCameraPriority(ptC.flightCam);
+    }
+
+    public void Exit()
+    {
+        // Restore controller dimensions
+        ptC.controller.height = ptC.defaultHeight;
+        ptC.controller.center = ptC.defaultCenter;
+
+        // Reset animator states
+        ptC.animator.SetBool("IsFlying", false);
+        ptC.animator.ResetTrigger("FlightStart");
+        ptC.animator.SetFloat("FlightX", 0f);
+        ptC.animator.SetFloat("FlightY", 0f);
+
+        // Reset flight speed
+        currentFlightSpeed = 0f;
+        isLanding = false;
+
+        Debug.Log("Exited: FlightPilotState");
+    }
+
+    public void FixedTick()
+    {
+        // PITCH & YAW CONTROL from input
+        float targetPitch = ptC.moveInput.y * ptC.pitchSpeed;
+        float targetYaw = ptC.moveInput.x * ptC.yawSpeed;
+
+        // Smooth rotation changes
+        currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.fixedDeltaTime * 5f);
+        currentYaw = Mathf.Lerp(currentYaw, targetYaw, Time.fixedDeltaTime * 5f);
+
+        // Apply rotation to transform
+        ptC.transform.Rotate(currentPitch * Time.fixedDeltaTime, currentYaw * Time.fixedDeltaTime, 0f, Space.Self);
+
+        // FORWARD PROPULSION - accelerate to flight speed
+        currentFlightSpeed = Mathf.MoveTowards(currentFlightSpeed, ptC.flightSpeed, ptC.flightAcceleration * Time.fixedDeltaTime);
+
+        // Move forward in the character's facing direction
+        Vector3 forwardMovement = ptC.transform.forward * currentFlightSpeed;
+
+        // Apply movement
+        ptC.controller.Move(forwardMovement * Time.fixedDeltaTime);
+
+        // Consume flight time
+        ptC.flightTimeRemaining -= Time.fixedDeltaTime;
+        ptC.flightTimeRemaining = Mathf.Max(0f, ptC.flightTimeRemaining);
+    }
+
+    public void Tick()
+    {
+        // Decrement grace time
+        if (stabilizeGraceTime > 0f)
+        {
+            stabilizeGraceTime -= Time.deltaTime;
+        }
+
+        // Update animator blend tree parameters
+        // FlightX = yaw (left/right), FlightY = pitch (up/down forward motion)
+        float smoothX = Mathf.Lerp(ptC.animator.GetFloat("FlightX"), ptC.moveInput.x, Time.deltaTime * ptC.animatorLerpRate);
+        float smoothY = Mathf.Lerp(ptC.animator.GetFloat("FlightY"), ptC.moveInput.y, Time.deltaTime * ptC.animatorLerpRate);
+        ptC.animator.SetFloat("FlightX", smoothX);
+        ptC.animator.SetFloat("FlightY", smoothY);
+
+        // Check for landing - use raycast to detect ground proximity
+        CheckForLanding();
+
+        // Counter animation root motion on meshRoot during flight
+        if (ptC.meshRoot != null)
+        {
+            ptC.meshRoot.localPosition = Vector3.zero;
+            ptC.meshRoot.localRotation = Quaternion.identity;
+        }
+
+        // Exit conditions (only after grace period)
+        if (stabilizeGraceTime <= 0f)
+        {
+            // Exit if launch button released or time expired
+            if (!ptC.launchHeld || ptC.flightTimeRemaining <= 0f)
+            {
+                ptC.ChangeState(ptC.FallPilotState);
+                return;
+            }
+
+            // Transition to hover if hover button pressed
+            if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
+            {
+                ptC.ChangeState(ptC.HoverPilotState);
+                return;
+            }
+        }
+    }
+
+    private void CheckForLanding()
+    {
+        // Only check for landing when moving downward
+        bool movingDownward = ptC.transform.forward.y < -0.3f;
+
+        if (!isLanding && movingDownward)
+        {
+            RaycastHit hit;
+            if (Physics.Raycast(ptC.controller.transform.position, Vector3.down, out hit, landingCheckDistance, ptC.groundLayerMask))
+            {
+                Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.red);
+                Debug.DrawRay(hit.point, hit.normal * 0.6f, Color.yellow);
+
+                // Calculate target rotation: Character should rotate to be upright relative to ground
+                Vector3 currentForward = ptC.transform.forward;
+                Vector3 groundUp = hit.normal;
+
+                // Project forward onto the ground plane to maintain facing direction
+                Vector3 projectedForward = Vector3.ProjectOnPlane(currentForward, groundUp).normalized;
+                if (projectedForward.sqrMagnitude < 0.01f)
+                {
+                    projectedForward = Vector3.ProjectOnPlane(ptC.transform.right, groundUp).normalized;
+                }
+
+                Quaternion targetRotation = Quaternion.LookRotation(projectedForward, groundUp);
+
+                // Rotate the main transform towards upright position
+                ptC.transform.rotation = Quaternion.Slerp(ptC.transform.rotation, targetRotation, Time.deltaTime * landRotateSpeed);
+
+                // Check angle between current up and target up
+                float angle = Vector3.Angle(ptC.transform.up, groundUp);
+
+                // Trigger landing when close enough to ground and nearly upright
+                float distanceToGround = hit.distance;
+                bool closeToGround = distanceToGround < 0.8f;
+                bool isNearlyUpright = angle < 15f;
+
+                if (closeToGround && isNearlyUpright)
+                {
+                    isLanding = true;
+                    ptC.TriggerLanding(ptC.velocity.y);
+
+                    // Transition to appropriate ground state
+                    if (ptC.aimHeld)
+                        ptC.ChangeState(ptC.AimWalkState);
+                    else
+                        ptC.ChangeState(ptC.FreeWalkState);
+                }
+            }
+            else
+            {
+                Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.green);
+            }
+        }
+
+        // Also check if grounded via controller
+        if (ptC.isGrounded && stabilizeGraceTime <= 0f)
+        {
+            isLanding = true;
+            ptC.TriggerLanding(ptC.velocity.y);
+
+            if (ptC.aimHeld)
+                ptC.ChangeState(ptC.AimWalkState);
+            else
+                ptC.ChangeState(ptC.FreeWalkState);
         }
     }
 }
