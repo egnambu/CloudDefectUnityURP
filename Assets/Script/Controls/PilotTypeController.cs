@@ -159,9 +159,15 @@ public class PilotTypeController : MonoBehaviour
             return;
         }
         if (aimHeld)
-            ChangeState(AimWalkState);
+        {
+            if (currentState != AimWalkState)
+                ChangeState(AimWalkState);
+        }
         else
-            ChangeState(FreeWalkState);
+        {
+            if (currentState != FreeWalkState)
+                ChangeState(FreeWalkState);
+        }
 
         if (jumpPressed)
             jumpBufferCounter = jumpBufferTime;
