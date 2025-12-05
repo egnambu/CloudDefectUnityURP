@@ -636,6 +636,7 @@ public class HoverPilotState : IPilotState
     private float baseHoverHeight;
     private bool hasStabilized; // Tracks if initial velocity has decayed
     private float stabilizeGraceTime; // Prevents immediate exit issues
+    private float currentAimLayerWeight; // For smooth aim layer blending
 
     public HoverPilotState(PilotTypeController controller)
     {
@@ -649,6 +650,7 @@ public class HoverPilotState : IPilotState
         hasStabilized = false;
         stabilizeGraceTime = 0.15f; // Small grace period on entry
         baseHoverHeight = ptC.transform.position.y;
+        currentAimLayerWeight = ptC.animator.GetLayerWeight(1); // Get current weight
 
         ptC.animator.SetBool("IsHovering", true);
         ptC.animator.SetBool("IsFalling", false);
@@ -662,6 +664,8 @@ public class HoverPilotState : IPilotState
         ptC.animator.SetBool("IsHovering", false);
         ptC.animator.SetFloat("HoverX", 0f);
         ptC.animator.SetFloat("HoverY", 0f);
+        // Reset aim layer weight on exit
+        ptC.animator.SetLayerWeight(1, 0f);
     }
 
     public void FixedTick()
@@ -726,6 +730,11 @@ public class HoverPilotState : IPilotState
         ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, localDir.z, Time.deltaTime * ptC.animatorLerpRate);
         ptC.animator.SetFloat("HoverX", ptC.smoothMoveX);
         ptC.animator.SetFloat("HoverY", ptC.smoothMoveY);
+
+        // Smoothly blend aim layer based on aimHeld
+        float targetAimWeight = ptC.aimHeld ? 1f : 0f;
+        currentAimLayerWeight = Mathf.Lerp(currentAimLayerWeight, targetAimWeight, Time.deltaTime * ptC.aimBlendSpeed);
+        ptC.animator.SetLayerWeight(1, currentAimLayerWeight);
 
         // Movement in Tick for smooth high-framerate rendering
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
