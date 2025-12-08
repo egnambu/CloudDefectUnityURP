@@ -17,7 +17,7 @@ MonoBehaviour:
     To: AimCamSK
     Blend:
       Style: 1
-      Time: 0.5
+      Time: 0.35
       CustomCurve:
         serializedVersion: 2
         m_Curve: []
@@ -27,8 +27,8 @@ MonoBehaviour:
   - From: FreeLookAimSK
     To: FlightCamSK
     Blend:
-      Style: 1
-      Time: 1.5
+      Style: 5
+      Time: 0.2
       CustomCurve:
         serializedVersion: 2
         m_Curve: []
@@ -50,7 +50,7 @@ MonoBehaviour:
     To: FlightCamSK
     Blend:
       Style: 1
-      Time: 0.5
+      Time: 0.2
       CustomCurve:
         serializedVersion: 2
         m_Curve: []
@@ -72,7 +72,7 @@ MonoBehaviour:
     To: FreeLookAimSK
     Blend:
       Style: 1
-      Time: 1
+      Time: 0.6
       CustomCurve:
         serializedVersion: 2
         m_Curve: []

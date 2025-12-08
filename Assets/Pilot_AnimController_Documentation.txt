@@ -2,7 +2,7 @@
 ANIMATOR CONTROLLER DOCUMENTATION
 Controller Name: Pilot_AnimController
 Asset Path: Assets/Characters/Pilot/SuperheroFlights/Pilot_AnimController.controller
-Generated: 12/5/2025 11:19:26 PM
+Generated: 12/6/2025 2:45:01 PM
 ============================================================
 
 ## PARAMETERS
@@ -225,7 +225,7 @@ Total Layers: 2
                 Frame Rate: 30 FPS
                 Looping: False
                 Legacy: False
-                TRANSITIONS (1):
+                TRANSITIONS (2):
                     TRANSITION: "Jump" -> "Fall"
                         Has Exit Time: True
                         Exit Time: 0.000
@@ -236,6 +236,17 @@ Total Layers: 2
                         Ordered Interruption: True
                         Can Transition To Self: True
                         CONDITIONS: (None - Exit Time Only)
+
+                    TRANSITION: "Jump" -> "Exit"
+                        Has Exit Time: False
+                        Has Fixed Duration: True
+                        Duration: 0.380
+                        Offset: 0.000
+                        Interruption Source: None
+                        Ordered Interruption: True
+                        Can Transition To Self: True
+                        CONDITIONS (1):
+                          - IsFlying == true
 
 
             STATE: "Light Land"
@@ -310,10 +321,9 @@ Total Layers: 2
                         CONDITIONS: (None - Exit Time Only)
 
                     TRANSITION: "Fall" -> "Exit"
-                        Has Exit Time: True
-                        Exit Time: 0.000
+                        Has Exit Time: False
                         Has Fixed Duration: True
-                        Duration: 0.260
+                        Duration: 0.141
                         Offset: 0.000
                         Interruption Source: None
                         Ordered Interruption: True
@@ -441,7 +451,7 @@ Total Layers: 2
                         Has Exit Time: True
                         Exit Time: 0.000
                         Has Fixed Duration: True
-                        Duration: 0.424
+                        Duration: 0.489
                         Offset: 0.000
                         Interruption Source: None
                         Ordered Interruption: True
@@ -463,9 +473,9 @@ Total Layers: 2
                 Min Threshold: 0
                 Max Threshold: 1
                 Children (5):
-                    - "A_FM_A_Lean_U" (Clip) @ Position: (0.00, 1.00)
+                    - "A_FM_A_Lean_D" (Clip) @ Position: (0.00, 1.00)
                     - "A_FM_A_Lean_L" (Clip) @ Position: (-1.00, 0.00)
-                    - "A_FM_A_Lean_D" (Clip) @ Position: (0.00, -1.00)
+                    - "A_FM_A_Lean_U" (Clip) @ Position: (0.00, -1.00)
                     - "A_FM_A_Lean_R" (Clip) @ Position: (1.00, 0.00)
                     - "A_Flight_FastMove_A" (Clip) @ Position: (0.00, 0.00)
                 TRANSITIONS (1):

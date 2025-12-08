@@ -289,13 +289,33 @@ public class FreeWalkState : IPilotState
         // Transition to fall state if not grounded
         if (!ptC.isGrounded)
         {
+            // Allow flight/hover transitions even when falling after landing
+            if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+            {
+                ptC.ChangeState(ptC.FlightPilotState);
+                return;
+            }
+            if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
+            {
+                ptC.ChangeState(ptC.HoverPilotState);
+                return;
+            }
+            
             ptC.ChangeState(ptC.FallPilotState);
             return;
         }
 
-        // During landing recovery - no movement, no state transitions
+        // During landing recovery - limited movement, but allow flight escape
         if (ptC.landingCooldown > 0f)
         {
+            // Allow flight transition during landing recovery (rocket jump!)
+            if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+            {
+                ptC.landingCooldown = 0f; // Cancel landing recovery
+                ptC.ChangeState(ptC.FlightPilotState);
+                return;
+            }
+            
             // Force idle animation during landing
             ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, 0f, Time.deltaTime * ptC.animatorLerpRate);
             ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, 0f, Time.deltaTime * ptC.animatorLerpRate);
@@ -390,6 +410,18 @@ public class AimWalkState : IPilotState
         // Transition to fall state if not grounded
         if (!ptC.isGrounded)
         {
+            // Allow flight/hover transitions even when falling after landing
+            if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+            {
+                ptC.ChangeState(ptC.FlightPilotState);
+                return;
+            }
+            if (ptC.hoverHeld && ptC.hoverTimeRemaining > 0f)
+            {
+                ptC.ChangeState(ptC.HoverPilotState);
+                return;
+            }
+            
             ptC.ChangeState(ptC.FallPilotState);
             return;
         }
@@ -397,9 +429,17 @@ public class AimWalkState : IPilotState
         // Declare camForward at method scope for reuse
         Vector3 camForward;
 
-        // During landing recovery - no movement, no state transitions
+        // During landing recovery - limited movement, but allow flight escape
         if (ptC.landingCooldown > 0f)
         {
+            // Allow flight transition during landing recovery (rocket jump!)
+            if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+            {
+                ptC.landingCooldown = 0f; // Cancel landing recovery
+                ptC.ChangeState(ptC.FlightPilotState);
+                return;
+            }
+            
             // Still allow aim rotation during landing
             camForward = ptC.cam.forward;
             camForward.y = 0f;
@@ -809,6 +849,9 @@ public class FlightPilotState : IPilotState
     private float landRotateSpeed = 6f;
     private float landingCheckDistance = 1.2f;
     private bool isLanding;
+    private bool isRotatingToLand; // Flag to stop flight rotation when preparing to land
+    private Vector3 originalGroundCheckLocalPos; // Store original local position of ground check point
+    private float launchGraceTime; // Prevents ground detection immediately after launching
 
     public FlightPilotState(PilotTypeController controller)
     {
@@ -822,8 +865,20 @@ public class FlightPilotState : IPilotState
         currentPitch = 0f;
         currentYaw = 0f;
         stabilizeGraceTime = 0.15f;
+        launchGraceTime = 0.35f; // Longer grace period to get off ground before checking landing
         isLanding = false;
-
+        isRotatingToLand = false;
+        
+        // Store original ground check position and move it to controller center during flight
+        if (ptC.groundCheckPoint != null)
+        {
+            originalGroundCheckLocalPos = ptC.groundCheckPoint.localPosition;
+            // Move ground check to match controller center (in local space)
+            ptC.groundCheckPoint.localPosition = ptC.controllerPoint != null 
+                ? ptC.transform.InverseTransformPoint(ptC.controllerPoint.position)
+                : new Vector3(0, 0.1f, 0);
+        }
+        
         // Resize controller for flight (smaller collider)
         ptC.controller.height = ptC.flightControllerHeight;
         if (ptC.controllerPoint != null)
@@ -835,21 +890,34 @@ public class FlightPilotState : IPilotState
             ptC.controller.center = new Vector3(0, 0.1f, 0);
         }
 
-        // Set animator states
+        // Set animator states - force transition by setting bool AND trigger
         ptC.animator.SetBool("IsFlying", true);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsHovering", false);
         ptC.animator.SetBool("IsAiming", false);
         ptC.animator.SetTrigger("FlightStart");
         
-        // Clear velocity - flight controls movement directly
-        ptC.velocity = Vector3.zero;
+        // Force animator to Flight Machine by playing the state directly if needed
+        // This handles the case where there's no valid transition from current state
+        ptC.animator.Play("Flight Machine.Flight Start", 0, 0f);
+
+        // Give initial upward velocity to launch off the ground
+        ptC.velocity = Vector3.up * 8f;
+        
+        // Tilt forward slightly to start flying forward
+        ptC.transform.rotation = Quaternion.Euler(-15f, ptC.transform.eulerAngles.y, 0f);
 
         ptC.SetCameraPriority(ptC.flightCam);
     }
 
     public void Exit()
     {
+        // Restore ground check point to original position
+        if (ptC.groundCheckPoint != null)
+        {
+            ptC.groundCheckPoint.localPosition = originalGroundCheckLocalPos;
+        }
+        
         // Restore controller dimensions
         ptC.controller.height = ptC.defaultHeight;
         ptC.controller.center = ptC.defaultCenter;
@@ -863,25 +931,41 @@ public class FlightPilotState : IPilotState
         // Reset flight speed
         currentFlightSpeed = 0f;
         isLanding = false;
+        isRotatingToLand = false;
 
         Debug.Log("Exited: FlightPilotState");
     }
 
     public void FixedTick()
     {
-        // PITCH & YAW CONTROL from input
-        float targetPitch = ptC.moveInput.y * ptC.pitchSpeed;
-        float targetYaw = ptC.moveInput.x * ptC.yawSpeed;
+        // During launch grace period, apply upward velocity to get off ground
+        if (launchGraceTime > 0f)
+        {
+            // Apply the upward launch velocity
+            ptC.controller.Move(ptC.velocity * Time.fixedDeltaTime);
+            // Decay upward velocity over time
+            ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, 15f * Time.fixedDeltaTime);
+            return; // Skip normal flight during launch
+        }
+        
+        // Only apply flight rotation if NOT rotating to land
+        if (!isRotatingToLand)
+        {
+            // PITCH & YAW CONTROL from input
+            float targetPitch = ptC.moveInput.y * ptC.pitchSpeed;
+            float targetYaw = ptC.moveInput.x * ptC.yawSpeed;
 
-        // Smooth rotation changes
-        currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.fixedDeltaTime * 5f);
-        currentYaw = Mathf.Lerp(currentYaw, targetYaw, Time.fixedDeltaTime * 5f);
+            // Smooth rotation changes
+            currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.fixedDeltaTime * 5f);
+            currentYaw = Mathf.Lerp(currentYaw, targetYaw, Time.fixedDeltaTime * 5f);
 
-        // Apply rotation to transform
-        ptC.transform.Rotate(currentPitch * Time.fixedDeltaTime, currentYaw * Time.fixedDeltaTime, 0f, Space.Self);
+            // Apply rotation to transform
+            ptC.transform.Rotate(currentPitch * Time.fixedDeltaTime, currentYaw * Time.fixedDeltaTime, 0f, Space.Self);
+        }
 
-        // FORWARD PROPULSION - accelerate to flight speed
-        currentFlightSpeed = Mathf.MoveTowards(currentFlightSpeed, ptC.flightSpeed, ptC.flightAcceleration * Time.fixedDeltaTime);
+        // FORWARD PROPULSION - accelerate to flight speed (reduced when landing)
+        float targetSpeed = isRotatingToLand ? ptC.flightSpeed * 0.3f : ptC.flightSpeed;
+        currentFlightSpeed = Mathf.MoveTowards(currentFlightSpeed, targetSpeed, ptC.flightAcceleration * Time.fixedDeltaTime);
 
         // Move forward in the character's facing direction
         Vector3 forwardMovement = ptC.transform.forward * currentFlightSpeed;
@@ -896,24 +980,28 @@ public class FlightPilotState : IPilotState
 
     public void Tick()
     {
-        // Decrement grace time
+        // Decrement grace times
         if (stabilizeGraceTime > 0f)
         {
             stabilizeGraceTime -= Time.deltaTime;
+        }
+        if (launchGraceTime > 0f)
+        {
+            launchGraceTime -= Time.deltaTime;
         }
 
         // Update animator blend tree parameters
         // FlightX = yaw (left/right), FlightY = pitch (up/down forward motion)
         float smoothX = Mathf.Lerp(ptC.animator.GetFloat("FlightX"), ptC.moveInput.x, Time.deltaTime * ptC.animatorLerpRate);
         float smoothY = Mathf.Lerp(ptC.animator.GetFloat("FlightY"), ptC.moveInput.y, Time.deltaTime * ptC.animatorLerpRate);
-        smoothX = Mathf.Clamp(smoothX, -1f, 1f);
-        smoothY = Mathf.Clamp(smoothY, -1f, 1f);
         ptC.animator.SetFloat("FlightX", smoothX);
         ptC.animator.SetFloat("FlightY", smoothY);
-        Debug.Log($"FlightX:"+ smoothX + " ,FlightY:" + smoothY );
 
-        // Check for landing - use raycast to detect ground proximity
-        CheckForLanding();
+        // Only check for landing after launch grace period (gives time to get off ground)
+        if (launchGraceTime <= 0f)
+        {
+            CheckForLanding();
+        }
 
         // Counter animation root motion on meshRoot during flight
         if (ptC.meshRoot != null)
@@ -943,61 +1031,72 @@ public class FlightPilotState : IPilotState
 
     private void CheckForLanding()
     {
-        // Only check for landing when moving downward
-        bool movingDownward = ptC.transform.forward.y < -0.3f;
-
-        if (!isLanding && movingDownward)
+        // Check for ground proximity - always raycast while flying to rotate towards upright
+        RaycastHit hit;
+        bool movingDownward = ptC.velocity.y < 0 || ptC.transform.forward.y < 0;
+        
+        // Raycast from the controller's center position (world space) during flight
+        Vector3 rayOrigin = ptC.transform.TransformPoint(ptC.controller.center);
+        
+        if (Physics.Raycast(rayOrigin, Vector3.down, out hit, landingCheckDistance, ptC.groundLayerMask))
         {
-            RaycastHit hit;
-            if (Physics.Raycast(ptC.controller.transform.position, Vector3.down, out hit, landingCheckDistance, ptC.groundLayerMask))
+            // Ground detected - start rotating to land (this disables flight rotation in FixedTick)
+            isRotatingToLand = true;
+            
+            Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.red);
+            Debug.DrawRay(hit.point, hit.normal * 0.6f, Color.yellow);
+
+            // Calculate target rotation: Character should rotate to be upright relative to ground
+            Vector3 currentForward = ptC.transform.forward;
+            Vector3 groundUp = hit.normal;
+
+            // Project forward onto the ground plane to maintain facing direction
+            Vector3 projectedForward = Vector3.ProjectOnPlane(currentForward, groundUp).normalized;
+            if (projectedForward.sqrMagnitude < 0.01f)
             {
-                Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.red);
-                Debug.DrawRay(hit.point, hit.normal * 0.6f, Color.yellow);
-
-                // Calculate target rotation: Character should rotate to be upright relative to ground
-                Vector3 currentForward = ptC.transform.forward;
-                Vector3 groundUp = hit.normal;
-
-                // Project forward onto the ground plane to maintain facing direction
-                Vector3 projectedForward = Vector3.ProjectOnPlane(currentForward, groundUp).normalized;
-                if (projectedForward.sqrMagnitude < 0.01f)
-                {
-                    projectedForward = Vector3.ProjectOnPlane(ptC.transform.right, groundUp).normalized;
-                }
-
-                Quaternion targetRotation = Quaternion.LookRotation(projectedForward, groundUp);
-
-                // Rotate the main transform towards upright position
-                ptC.transform.rotation = Quaternion.Slerp(ptC.transform.rotation, targetRotation, Time.deltaTime * landRotateSpeed);
-
-                // Check angle between current up and target up
-                float angle = Vector3.Angle(ptC.transform.up, groundUp);
-
-                // Trigger landing when close enough to ground and nearly upright
-                float distanceToGround = hit.distance;
-                bool closeToGround = distanceToGround < 0.8f;
-                bool isNearlyUpright = angle < 15f;
-
-                if (closeToGround && isNearlyUpright)
-                {
-                    isLanding = true;
-                    ptC.TriggerLanding(ptC.velocity.y);
-
-                    // Transition to appropriate ground state
-                    if (ptC.aimHeld)
-                        ptC.ChangeState(ptC.AimWalkState);
-                    else
-                        ptC.ChangeState(ptC.FreeWalkState);
-                }
+                projectedForward = Vector3.ProjectOnPlane(ptC.transform.right, groundUp).normalized;
             }
-            else
+
+            Quaternion targetRotation = Quaternion.LookRotation(projectedForward, groundUp);
+
+            // Rotate the main transform towards upright position
+            ptC.transform.rotation = Quaternion.Slerp(ptC.transform.rotation, targetRotation, Time.deltaTime * landRotateSpeed);
+
+            // Check angle between current up and target up
+            float angle = Vector3.Angle(ptC.transform.up, groundUp);
+            
+            // Debug info
+            Debug.Log($"Landing angle remaining: {angle:F1}° | Ground normal: {groundUp} | Transform up: {ptC.transform.up}");
+            Debug.DrawRay(ptC.transform.position, ptC.transform.up * 0.4f, Color.blue); // Current up
+            Debug.DrawRay(ptC.transform.position, groundUp * 0.4f, Color.green); // Target up (ground normal)
+
+            // Trigger landing when close enough to ground and nearly upright (or moving downward)
+            float distanceToGround = hit.distance;
+            bool closeToGround = distanceToGround < 0.8f;
+            bool isNearlyUpright = angle < 10f;
+
+            if (!isLanding && closeToGround && (isNearlyUpright || movingDownward))
             {
-                Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.green);
+                isLanding = true;
+                ptC.TriggerLanding(ptC.velocity.y);
+                Debug.Log($"Landing triggered! Distance: {distanceToGround:F2}, Angle: {angle:F1}");
+
+                // Transition to appropriate ground state
+                if (ptC.aimHeld)
+                    ptC.ChangeState(ptC.AimWalkState);
+                else
+                    ptC.ChangeState(ptC.FreeWalkState);
             }
         }
+        else
+        {
+            // No ground detected - allow flight rotation again
+            isRotatingToLand = false;
+            Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.green);
+        }
 
-        // Also check if grounded via controller
-        if (ptC.isGrounded && stabilizeGraceTime <= 0f)
+        // Also check if grounded via controller (but only after launch grace period)
+        if (!isLanding && ptC.isGrounded && stabilizeGraceTime <= 0f && launchGraceTime <= 0f)
         {
             isLanding = true;
             ptC.TriggerLanding(ptC.velocity.y);

@@ -973,8 +973,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 961739749}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.6478772, y: 90.394424, z: -2.5834532}
+  m_LocalRotation: {x: -0.16018224, y: -0.000000013855585, z: -0.0000000022484519, w: 0.9870875}
+  m_LocalPosition: {x: 0.6478772, y: 90.145004, z: -1.8834531}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1965,7 +1965,7 @@ MonoBehaviour:
     LookAtTarget: {fileID: 0}
     CustomLookAtTarget: 0
   Lens:
-    FieldOfView: 60.000004
+    FieldOfView: 50
     OrthographicSize: 5
     NearClipPlane: 0.3
     FarClipPlane: 1000
@@ -2434,8 +2434,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2633451832616852161}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.2297529, y: 0.000000028872192, z: -0.000000006815799, w: 0.973249}
-  m_LocalPosition: {x: 0.6478772, y: 91.645004, z: -2.3834531}
+  m_LocalRotation: {x: -0.16018222, y: -0.000000013855584, z: -0.0000000022484516, w: 0.9870875}
+  m_LocalPosition: {x: 0.6478772, y: 90.145004, z: -1.8834531}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2449,8 +2449,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1867742227702428543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.29521236, y: 0, z: 0, w: 0.9554317}
-  m_LocalPosition: {x: 0.6478772, y: 88.902115, z: -3.2446039}
+  m_LocalRotation: {x: 0.3560676, y: 0.000000010864872, z: -0.0000000041399604, w: 0.9344602}
+  m_LocalPosition: {x: 0.6478772, y: 90.60141, z: -2.2908869}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2526,13 +2526,13 @@ MonoBehaviour:
   Radius: 5
   Orbits:
     Top:
-      Radius: 2
-      Height: 2
-    Center:
-      Radius: 2
+      Radius: 1
       Height: 1
-    Bottom:
+    Center:
       Radius: 1.5
+      Height: -0.5
+    Bottom:
+      Radius: 1
       Height: -1
     SplineCurvature: 0.5
   RecenteringTarget: 2
@@ -2744,6 +2744,7 @@ GameObject:
   - component: {fileID: 9027977280549515334}
   - component: {fileID: 9027977280549515335}
   - component: {fileID: 9027977280549515336}
+  - component: {fileID: 9027977280549515337}
   m_Layer: 3
   m_Name: SK_Mannequin
   m_TagString: Untagged
@@ -4687,15 +4688,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b5d7c088409d9a40b7b09aa707777f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineOrbitalFollow
-  TargetOffset: {x: 0, y: -1, z: 0}
+  TargetOffset: {x: 0, y: 1, z: 0}
   TrackerSettings:
     BindingMode: 3
-    PositionDamping: {x: 1, y: 1, z: 1}
+    PositionDamping: {x: 0.5, y: 0.5, z: 0.5}
     AngularDampingMode: 0
-    RotationDamping: {x: 1, y: 1, z: 1}
+    RotationDamping: {x: 0.5, y: 0.5, z: 0.5}
     QuaternionDamping: 1
   OrbitStyle: 0
-  Radius: 3
+  Radius: 2
   Orbits:
     Top:
       Radius: 2
@@ -5517,6 +5518,93 @@ MonoBehaviour:
   smoothMoveY: 0
   defaultHeight: 0
   defaultCenter: {x: 0, y: 0, z: 0}
+--- !u!114 &9027977280549515337
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2369506901432922246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2d8418b0b9634b1892b0268dd9c2743, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Animation.Rigging::UnityEngine.Animations.Rigging.BoneRenderer
+  boneShape: 1
+  drawBones: 1
+  drawTripods: 0
+  boneSize: 1
+  tripodSize: 1
+  boneColor: {r: 0.45421734, g: 0.6226415, b: 0.12570308, a: 0.5}
+  m_Transforms:
+  - {fileID: 1275071845912813992}
+  - {fileID: 7836587957471085061}
+  - {fileID: 1474359140952047239}
+  - {fileID: 3617774955648520549}
+  - {fileID: 3872106760236652367}
+  - {fileID: 4389782757278329749}
+  - {fileID: 8524707343370735610}
+  - {fileID: 2753460386068920928}
+  - {fileID: 8287055664043078878}
+  - {fileID: 1163140136980155746}
+  - {fileID: 820751419096697929}
+  - {fileID: 4023188180217647182}
+  - {fileID: 6846473246929416928}
+  - {fileID: 215781283603722993}
+  - {fileID: 6779263314223528012}
+  - {fileID: 7037956365778767408}
+  - {fileID: 8821188666361896319}
+  - {fileID: 2996940924925577472}
+  - {fileID: 6932127067805331631}
+  - {fileID: 7635344112941139719}
+  - {fileID: 7211108206882003285}
+  - {fileID: 1680088266148586413}
+  - {fileID: 4675228583923475988}
+  - {fileID: 3339438494175253124}
+  - {fileID: 3361342359736029347}
+  - {fileID: 753719265826837914}
+  - {fileID: 3896221034701138885}
+  - {fileID: 7721858880806235647}
+  - {fileID: 7225044609757906218}
+  - {fileID: 5564928795369588766}
+  - {fileID: 8939757762082988581}
+  - {fileID: 8647819614472466818}
+  - {fileID: 2632218006192947121}
+  - {fileID: 8306818628617575907}
+  - {fileID: 8713293834919550402}
+  - {fileID: 4797371397693820696}
+  - {fileID: 7586741305570992926}
+  - {fileID: 683148032332513278}
+  - {fileID: 759727869789666861}
+  - {fileID: 392668901911561393}
+  - {fileID: 745460305618374941}
+  - {fileID: 759951754339664019}
+  - {fileID: 8756746849409904280}
+  - {fileID: 3159257115889228124}
+  - {fileID: 4672264487484973080}
+  - {fileID: 7687016182092770377}
+  - {fileID: 8499412630299141347}
+  - {fileID: 2767248215572972662}
+  - {fileID: 6849674175473900363}
+  - {fileID: 1120598716189278607}
+  - {fileID: 3736041612098018422}
+  - {fileID: 310889450793569710}
+  - {fileID: 5275102160239633207}
+  - {fileID: 5465824133200108656}
+  - {fileID: 4772657334057385188}
+  - {fileID: 1342045496127770803}
+  - {fileID: 3249868821250550905}
+  - {fileID: 1662200328886615115}
+  - {fileID: 2166135390800425400}
+  - {fileID: 7466640702484899934}
+  - {fileID: 2087830666082971580}
+  - {fileID: 7779258328225476501}
+  - {fileID: 6826597747953400452}
+  - {fileID: 7455328514508562419}
+  - {fileID: 3379418944867092736}
+  - {fileID: 7860262275327078245}
+  - {fileID: 4939556714608346863}
+  - {fileID: 7035635434730201581}
 --- !u!1 &9177519752951025263
 GameObject:
   m_ObjectHideFlags: 0
