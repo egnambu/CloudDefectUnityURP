@@ -1961,7 +1961,7 @@ MonoBehaviour:
   m_StreamingVersion: 20241001
   m_LegacyPriority: 0
   Target:
-    TrackingTarget: {fileID: 1742660166}
+    TrackingTarget: {fileID: 1766786348}
     LookAtTarget: {fileID: 0}
     CustomLookAtTarget: 0
   Lens:
@@ -2385,7 +2385,7 @@ MonoBehaviour:
       Owner: {fileID: 5555488765518749522}
       Enabled: 1
       Input:
-        InputAction: {fileID: -5630151704836100654, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+        InputAction: {fileID: 5497975914000743883, guid: ed3a289cf38ee8947a292fc2780c5d6b, type: 3}
         Gain: -1
         CancelDeltaTime: 0
       InputValue: 0
@@ -2449,8 +2449,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1867742227702428543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.3560676, y: 0.000000010864872, z: -0.0000000041399604, w: 0.9344602}
-  m_LocalPosition: {x: 0.6478772, y: 90.60141, z: -2.2908869}
+  m_LocalRotation: {x: 0.34214774, y: 0.000000023875737, z: -0.000000008693729, w: 0.9396462}
+  m_LocalPosition: {x: 0.6478772, y: 92.246414, z: -2.2908869}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5475,6 +5475,10 @@ MonoBehaviour:
   jumpBufferTime: 0.1
   landingCooldown: 0
   airborneGraceTime: 0
+  isUsingGamepad: 0
+  gamepadLookSensitivity: 100
+  mouseLookSensitivity: 0.1
+  stickDeadzone: 0.1
   controller: {fileID: 9027977280549515335}
   cam: {fileID: 961739753}
   animator: {fileID: 9027977280549515334}
@@ -5499,6 +5503,7 @@ MonoBehaviour:
   hoverBobAmplitude: 0.3
   hoverBobFrequency: 1.5
   hoverMoveSpeed: 4
+  hoverVerticalSpeed: 3
   hoverTimeRemaining: 0
   flightSpeed: 34
   flightAcceleration: 8
@@ -5510,10 +5515,13 @@ MonoBehaviour:
   meshRoot: {fileID: 1275071845912813992}
   flightTimeRemaining: 0
   moveInput: {x: 0, y: 0}
+  lookInput: {x: 0, y: 0}
   aimHeld: 0
   jumpPressed: 0
   launchHeld: 0
   hoverHeld: 0
+  launchTriggerValue: 0
+  hoverTriggerValue: 0
   smoothMoveX: 0
   smoothMoveY: 0
   defaultHeight: 0

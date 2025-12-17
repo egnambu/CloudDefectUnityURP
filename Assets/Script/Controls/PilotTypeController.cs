@@ -13,6 +13,12 @@ public class PilotTypeController : MonoBehaviour
     public float landingCooldown;
     [HideInInspector] public float airborneGraceTime; // Prevents immediate ground detection after jumping
 
+    [Header("Input Settings")]
+    public bool isUsingGamepad;
+    public float gamepadLookSensitivity = 1000f;
+    public float mouseLookSensitivity = 0.1f;
+    [Range(0f, 0.2f)] public float stickDeadzone = 0.1f;
+
     [Header("Core Components")]
     public CharacterController controller;
     public Transform cam;
@@ -46,6 +52,7 @@ public class PilotTypeController : MonoBehaviour
     public float hoverBobAmplitude = 0.3f; // How much the character bobs up/down
     public float hoverBobFrequency = 1.5f; // Speed of the bob oscillation
     public float hoverMoveSpeed = 4f; // Horizontal movement speed while hovering
+    public float hoverVerticalSpeed = 3f; // Vertical speed when using analog trigger
     [HideInInspector] public float hoverTimeRemaining;
 
     [Header("Flight Settings")]
@@ -61,10 +68,15 @@ public class PilotTypeController : MonoBehaviour
 
     [HideInInspector] public Pilot1 input;
     [HideInInspector] public Vector2 moveInput;
+    [HideInInspector] public Vector2 lookInput;
     [HideInInspector] public bool aimHeld;
     [HideInInspector] public bool jumpPressed;
     [HideInInspector] public bool launchHeld;
     [HideInInspector] public bool hoverHeld;
+    
+    // Analog trigger values (0-1 range)
+    [HideInInspector] public float launchTriggerValue; // R2 - flight speed control
+    [HideInInspector] public float hoverTriggerValue;  // L2 - hover altitude control
 
     [HideInInspector] public float smoothMoveX;
     [HideInInspector] public float smoothMoveY;
@@ -129,10 +141,52 @@ public class PilotTypeController : MonoBehaviour
     void ReadInput()
     {
         moveInput = input.PlayerA.Move.ReadValue<Vector2>();
+        lookInput = input.PlayerA.Look.ReadValue<Vector2>();
         aimHeld = input.PlayerA.Aim.IsPressed();
         jumpPressed = input.PlayerA.Jump.IsPressed();
-        hoverHeld = input.PlayerA.Hover.IsPressed();
-        launchHeld = input.PlayerA.Launch.IsPressed();
+
+        // Read analog trigger values from input actions (preserves analog pressure)
+        launchTriggerValue = input.PlayerA.Launch.ReadValue<float>();
+        hoverTriggerValue = input.PlayerA.Hover.ReadValue<float>();
+        
+        // Detect if using gamepad - check multiple controls to properly detect device
+        var moveControl = input.PlayerA.Move.activeControl;
+        var launchControl = input.PlayerA.Launch.activeControl;
+        var hoverControl = input.PlayerA.Hover.activeControl;
+        
+        bool moveIsGamepad = moveControl != null && moveControl.device is UnityEngine.InputSystem.Gamepad;
+        bool launchIsGamepad = launchControl != null && launchControl.device is UnityEngine.InputSystem.Gamepad;
+        bool hoverIsGamepad = hoverControl != null && hoverControl.device is UnityEngine.InputSystem.Gamepad;
+        
+        isUsingGamepad = moveIsGamepad || launchIsGamepad || hoverIsGamepad;
+        
+        // Keyboard gives 0 or 1 for hover (binary), gamepad gives 0-1 analog range
+        // For keyboard hover, use 0.5 as neutral hover position to maintain altitude
+        if (!hoverIsGamepad && hoverTriggerValue > 0f)
+        {
+            hoverTriggerValue = 0.5f; // Neutral hover for keyboard
+        }
+        
+        // Determine if triggers are held (threshold for activation)
+        launchHeld = launchTriggerValue > 0.1f;
+        hoverHeld = hoverTriggerValue > 0.1f;
+        
+        // Debug: Show trigger values when in hover or flight state
+        if (currentState == HoverPilotState || currentState == FlightPilotState)
+        {
+            Debug.Log($"L2 (Hover): {hoverTriggerValue:F2} | R2 (Launch): {launchTriggerValue:F2} | HoverIsGamepad: {hoverIsGamepad}");
+        }
+        
+        // Apply deadzone to stick input
+        if (moveInput.magnitude < stickDeadzone)
+        {
+            moveInput = Vector2.zero;
+        }
+        else
+        {
+            // Remap input to use full range after deadzone
+            moveInput = moveInput.normalized * ((moveInput.magnitude - stickDeadzone) / (1f - stickDeadzone));
+        }
     }
 
 
@@ -701,10 +755,9 @@ public class HoverPilotState : IPilotState
 
     public void FixedTick()
     {
-        // Physics calculations only - velocity decay
+        // Physics calculations only - velocity decay for horizontal
         float decayFactor = ptC.hoverVelocityDecayRate * Time.fixedDeltaTime;
         ptC.velocity.x = Mathf.MoveTowards(ptC.velocity.x, 0f, decayFactor);
-        ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, decayFactor);
         ptC.velocity.z = Mathf.MoveTowards(ptC.velocity.z, 0f, decayFactor);
 
         // Check if velocity has stabilized (near zero)
@@ -714,16 +767,48 @@ public class HoverPilotState : IPilotState
             baseHoverHeight = ptC.transform.position.y;
         }
 
-        // Apply bob effect only after stabilized
+        // ANALOG TRIGGER ALTITUDE CONTROL (L2 for hover)
+        // 0.55 to 0.85 = hover in place (with bob)
+        // < 0.55 = descend
+        // > 0.85 = ascend
+        float triggerValue = ptC.hoverTriggerValue;
+        float neutralZoneLow = 0.55f;
+        float neutralZoneHigh = 0.85f;
+        
         if (hasStabilized)
         {
-            hoverBobTimer += Time.fixedDeltaTime;
-            float bobOffset = Mathf.Sin(hoverBobTimer * ptC.hoverBobFrequency * Mathf.PI * 2f) * ptC.hoverBobAmplitude;
-            
-            // Calculate bob velocity to maintain smooth oscillation
-            float targetY = baseHoverHeight + bobOffset;
-            float currentY = ptC.transform.position.y;
-            ptC.velocity.y = (targetY - currentY) * 5f; // Smooth follow
+            if (triggerValue < neutralZoneLow)
+            {
+                // Descending - map 0.55 to 0 => 0 to -1 vertical input
+                float descendInput = (neutralZoneLow - triggerValue) / neutralZoneLow;
+                ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, -ptC.hoverVerticalSpeed * descendInput, decayFactor * 3f);
+                // Update base height for when returning to neutral
+                baseHoverHeight = ptC.transform.position.y;
+            }
+            else if (triggerValue > neutralZoneHigh)
+            {
+                // Ascending - map 0.85 to 1 => 0 to 1 vertical input
+                float ascendInput = (triggerValue - neutralZoneHigh) / (1f - neutralZoneHigh);
+                ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, ptC.hoverVerticalSpeed * ascendInput, decayFactor * 3f);
+                // Update base height for when returning to neutral
+                baseHoverHeight = ptC.transform.position.y;
+            }
+            else
+            {
+                // Neutral zone - apply bob effect
+                hoverBobTimer += Time.fixedDeltaTime;
+                float bobOffset = Mathf.Sin(hoverBobTimer * ptC.hoverBobFrequency * Mathf.PI * 2f) * ptC.hoverBobAmplitude;
+                
+                // Calculate bob velocity to maintain smooth oscillation
+                float targetY = baseHoverHeight + bobOffset;
+                float currentY = ptC.transform.position.y;
+                ptC.velocity.y = (targetY - currentY) * 5f; // Smooth follow
+            }
+        }
+        else
+        {
+            // Still stabilizing - decay vertical velocity
+            ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, decayFactor);
         }
     }
 
@@ -880,8 +965,10 @@ public class FlightPilotState : IPilotState
         // Apply rotation to transform
         ptC.transform.Rotate(currentPitch * Time.fixedDeltaTime, currentYaw * Time.fixedDeltaTime, 0f, Space.Self);
 
-        // FORWARD PROPULSION - accelerate to flight speed
-        currentFlightSpeed = Mathf.MoveTowards(currentFlightSpeed, ptC.flightSpeed, ptC.flightAcceleration * Time.fixedDeltaTime);
+        // ANALOG TRIGGER SPEED CONTROL (R2 for flight)
+        // Speed is proportional to trigger pressure: 20% press = 20% speed, etc.
+        float targetSpeed = ptC.flightSpeed * ptC.launchTriggerValue;
+        currentFlightSpeed = Mathf.MoveTowards(currentFlightSpeed, targetSpeed, ptC.flightAcceleration * Time.fixedDeltaTime);
 
         // Move forward in the character's facing direction
         Vector3 forwardMovement = ptC.transform.forward * currentFlightSpeed;
