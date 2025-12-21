@@ -145,6 +145,15 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Sprint"",
+                    ""type"": ""Button"",
+                    ""id"": ""5180898d-5d07-4f73-ac0d-2a25a5bd81e8"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -323,6 +332,28 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
                     ""action"": ""Hover"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""db0659c2-fd4b-4198-b3e4-2fb6e5b2dc96"",
+                    ""path"": ""<Keyboard>/ctrl"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Sprint"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""3d03ad91-a790-460b-a27f-6d2ba8247bc5"",
+                    ""path"": ""<Gamepad>/rightShoulder"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Sprint"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -337,6 +368,7 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
         m_PlayerA_Aim = m_PlayerA.FindAction("Aim", throwIfNotFound: true);
         m_PlayerA_Launch = m_PlayerA.FindAction("Launch", throwIfNotFound: true);
         m_PlayerA_Hover = m_PlayerA.FindAction("Hover", throwIfNotFound: true);
+        m_PlayerA_Sprint = m_PlayerA.FindAction("Sprint", throwIfNotFound: true);
     }
 
     ~@Pilot1()
@@ -423,6 +455,7 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
     private readonly InputAction m_PlayerA_Aim;
     private readonly InputAction m_PlayerA_Launch;
     private readonly InputAction m_PlayerA_Hover;
+    private readonly InputAction m_PlayerA_Sprint;
     /// <summary>
     /// Provides access to input actions defined in input action map "PlayerA".
     /// </summary>
@@ -458,6 +491,10 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "PlayerA/Hover".
         /// </summary>
         public InputAction @Hover => m_Wrapper.m_PlayerA_Hover;
+        /// <summary>
+        /// Provides access to the underlying input action "PlayerA/Sprint".
+        /// </summary>
+        public InputAction @Sprint => m_Wrapper.m_PlayerA_Sprint;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -502,6 +539,9 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
             @Hover.started += instance.OnHover;
             @Hover.performed += instance.OnHover;
             @Hover.canceled += instance.OnHover;
+            @Sprint.started += instance.OnSprint;
+            @Sprint.performed += instance.OnSprint;
+            @Sprint.canceled += instance.OnSprint;
         }
 
         /// <summary>
@@ -531,6 +571,9 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
             @Hover.started -= instance.OnHover;
             @Hover.performed -= instance.OnHover;
             @Hover.canceled -= instance.OnHover;
+            @Sprint.started -= instance.OnSprint;
+            @Sprint.performed -= instance.OnSprint;
+            @Sprint.canceled -= instance.OnSprint;
         }
 
         /// <summary>
@@ -613,5 +656,12 @@ public partial class @Pilot1: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnHover(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Sprint" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSprint(InputAction.CallbackContext context);
     }
 }

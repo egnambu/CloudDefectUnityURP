@@ -1,11 +1,11 @@
 using UnityEngine;
 using Unity.Cinemachine;
 
-public class PilotTypeController : MonoBehaviour
+public class PilotTypeControllerVariantF : MonoBehaviour
 {
         [Header("Debug (Read Only)")]
     [SerializeField] private string currentStateName;
-    public IPilotState currentState;
+    public IPilotVFState currentState;
     public Vector3 velocity;
     public bool isGrounded;
     [SerializeField] float jumpBufferTime = 0.1f;
@@ -48,7 +48,7 @@ public class PilotTypeController : MonoBehaviour
 
     [Header("Hover Settings")]
     public float hoverMaxDuration = 20f;
-    public float hoverVelocityDecayRate = 35f; // How fast velocity decays to zero
+    public float hoverVelocityDecayRate = 15f; // How fast velocity decays to zero
     public float hoverBobAmplitude = 0.3f; // How much the character bobs up/down
     public float hoverBobFrequency = 1.5f; // Speed of the bob oscillation
     public float hoverMoveSpeed = 4f; // Horizontal movement speed while hovering
@@ -71,7 +71,6 @@ public class PilotTypeController : MonoBehaviour
     [HideInInspector] public Vector2 lookInput;
     [HideInInspector] public bool aimHeld;
     [HideInInspector] public bool jumpPressed;
-    [HideInInspector] public bool sprintPressed;
     [HideInInspector] public bool launchHeld;
     [HideInInspector] public bool hoverHeld;
     
@@ -145,7 +144,6 @@ public class PilotTypeController : MonoBehaviour
         lookInput = input.PlayerA.Look.ReadValue<Vector2>();
         aimHeld = input.PlayerA.Aim.IsPressed();
         jumpPressed = input.PlayerA.Jump.IsPressed();
-        sprintPressed = input.PlayerA.Sprint.IsPressed();
 
         // Read analog trigger values from input actions (preserves analog pressure)
         launchTriggerValue = input.PlayerA.Launch.ReadValue<float>();
@@ -192,7 +190,7 @@ public class PilotTypeController : MonoBehaviour
     }
 
 
-    public void ChangeState(IPilotState newState)
+    public void ChangeState(IPilotVFState newState)
     {
         if (newState == null) return;
 
@@ -282,13 +280,11 @@ public class PilotTypeController : MonoBehaviour
         Debug.Log($"Falling Speed:" + fallingSpeed);
         if (fallingSpeed > 10f)
         {
-            Debug.Log($"HeavyLanding:" + fallVelocity);
             animator.SetTrigger("HeavyLanding");
             landingCooldown = 1.25f; // Heavy landing recovery time
         }
         else
         {
-            Debug.Log($"LightLanding:" + fallVelocity);
             animator.SetTrigger("LightLanding");
             landingCooldown = 0.4f; // Light landing recovery time
         }
@@ -310,7 +306,7 @@ public class PilotTypeController : MonoBehaviour
     }
 }
 
-public interface IPilotState
+public interface IPilotVFState
 {
     void Enter();
     void Exit();
@@ -318,7 +314,7 @@ public interface IPilotState
     void FixedTick();
 }
 
-public class FreeWalkState : IPilotState
+public class FreeWalkState : IPilotVFState
 {
     private readonly PilotTypeController ptC;
     private float forwardSpeed;
@@ -369,8 +365,7 @@ public class FreeWalkState : IPilotState
 
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
 
-        // Sprint logic: Both keyboard and gamepad use Sprint button
-        isSprinting = ptC.sprintPressed && ptC.isGrounded && ptC.moveInput.magnitude > 0.01f;
+        isSprinting = ptC.launchHeld && ptC.isGrounded;
 
         if (moveDir.sqrMagnitude > 0.01f)
         {
@@ -422,7 +417,7 @@ public class FreeWalkState : IPilotState
 }
 
 
-public class AimWalkState : IPilotState
+public class AimWalkState : IPilotVFState
 {
     private readonly PilotTypeController ptC;
 
@@ -532,7 +527,7 @@ public class AimWalkState : IPilotState
 
 }
 
-public class JumpPilotState : IPilotState
+public class JumpPilotState : IPilotVFState
 {
     private readonly PilotTypeController ptC;
     private bool hasAppliedJumpForce;
@@ -622,7 +617,7 @@ public class JumpPilotState : IPilotState
 
 }
 
-public class FallPilotState : IPilotState
+public class FallPilotState : IPilotVFState
 {
     private readonly PilotTypeController ptC;
     private float fallTime;
@@ -718,7 +713,7 @@ public class FallPilotState : IPilotState
     }
 }
 
-public class HoverPilotState : IPilotState
+public class HoverPilotState : IPilotVFState
 {
     private readonly PilotTypeController ptC;
     private float hoverBobTimer;
@@ -765,27 +760,23 @@ public class HoverPilotState : IPilotState
         ptC.velocity.x = Mathf.MoveTowards(ptC.velocity.x, 0f, decayFactor);
         ptC.velocity.z = Mathf.MoveTowards(ptC.velocity.z, 0f, decayFactor);
 
-        // Always decay vertical velocity aggressively when entering hover
-        if (!hasStabilized)
+        // Check if velocity has stabilized (near zero)
+        if (!hasStabilized && Mathf.Abs(ptC.velocity.y) < 0.5f)
         {
-            // Rapidly decay vertical velocity to stabilize - use very aggressive decay
-            float verticalDecay = decayFactor * 4f; // 4x decay rate for vertical
-            ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, verticalDecay);
-            
-            // Check if velocity has stabilized (near zero)
-            if (Mathf.Abs(ptC.velocity.y) < 0.5f && Mathf.Abs(ptC.velocity.x) < 0.5f && Mathf.Abs(ptC.velocity.z) < 0.5f)
-            {
-                hasStabilized = true;
-                baseHoverHeight = ptC.transform.position.y;
-            }
+            hasStabilized = true;
+            baseHoverHeight = ptC.transform.position.y;
         }
-        else
+
+        // ANALOG TRIGGER ALTITUDE CONTROL (L2 for hover)
+        // 0.55 to 0.85 = hover in place (with bob)
+        // < 0.55 = descend
+        // > 0.85 = ascend
+        float triggerValue = ptC.hoverTriggerValue;
+        float neutralZoneLow = 0.55f;
+        float neutralZoneHigh = 0.85f;
+        
+        if (hasStabilized)
         {
-            // 0.55 to 0.85 = hover in place (with bob) : < 0.55 = descend : > 0.85 = ascend
-            float triggerValue = ptC.hoverTriggerValue;
-            float neutralZoneLow = 0.55f;
-            float neutralZoneHigh = 0.85f;
-            
             if (triggerValue < neutralZoneLow)
             {
                 // Descending - map 0.55 to 0 => 0 to -1 vertical input
@@ -813,6 +804,11 @@ public class HoverPilotState : IPilotState
                 float currentY = ptC.transform.position.y;
                 ptC.velocity.y = (targetY - currentY) * 5f; // Smooth follow
             }
+        }
+        else
+        {
+            // Still stabilizing - decay vertical velocity
+            ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, decayFactor);
         }
     }
 
@@ -865,18 +861,18 @@ public class HoverPilotState : IPilotState
         // Exit conditions (only after grace period)
         if (stabilizeGraceTime <= 0f)
         {
-            // Check for ground contact FIRST (highest priority when grounded)
-            if (ptC.isGrounded)
+            // Exit if hover button released or time expired
+            if (!ptC.hoverHeld || ptC.hoverTimeRemaining <= 0f)
             {
-                // Store velocity before resetting for landing animation
-                float landingVelocity = ptC.velocity.y;
-                
-                // Reset velocity before transitioning - prevents carrying fall speed
-                ptC.velocity = Vector3.zero;
-                
-                // Trigger landing animation based on how fast we were falling
-                ptC.TriggerLanding(landingVelocity);
-                Debug.Log("TriggerLanding in Hover with velocity: " + landingVelocity);
+                ptC.ChangeState(ptC.FallPilotState);
+                return;
+            }
+
+            // Exit if grounded (landed while hovering low)
+            if (ptC.isGrounded && hasStabilized)
+            {
+                // Trigger soft landing since hover slows descent
+                ptC.TriggerLanding(ptC.velocity.y);
                 
                 if (ptC.aimHeld)
                     ptC.ChangeState(ptC.AimWalkState);
@@ -884,18 +880,11 @@ public class HoverPilotState : IPilotState
                     ptC.ChangeState(ptC.FreeWalkState);
                 return;
             }
-            
-            // Exit if hover button released or time expired
-            if (!ptC.hoverHeld || ptC.hoverTimeRemaining <= 0f)
-            {
-                ptC.ChangeState(ptC.FallPilotState);
-                return;
-            }
         }
     }
 }
 
-public class FlightPilotState : IPilotState
+public class FlightPilotState : IPilotVFState
 {
     private readonly PilotTypeController ptC;
     private float currentFlightSpeed;
