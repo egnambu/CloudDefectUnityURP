@@ -1,9 +1,12 @@
 using UnityEngine;
 using Unity.Cinemachine;
+using Unity.VisualScripting;
 
+namespace MadeInJupiter.Controls
+{
 public class PilotTypeController : MonoBehaviour
 {
-        [Header("Debug (Read Only)")]
+    [Header("Debug (Read Only)")]
     [SerializeField] private string currentStateName;
     public IPilotState currentState;
     public Vector3 velocity;
@@ -28,6 +31,8 @@ public class PilotTypeController : MonoBehaviour
     public CinemachineCamera followCam;
     public CinemachineCamera aimCam;
     public CinemachineCamera flightCam;
+    [Tooltip("Optional: Dedicated camera for AimFlight state. If not set, uses flightCam.")]
+    public CinemachineCamera aimFlightCam;
 
     [Header("Movement Settings")]
     public float moveSpeed = 5f;
@@ -44,10 +49,10 @@ public class PilotTypeController : MonoBehaviour
     [Header("Animator Settings")]
     public float animatorLerpRate = 12f;
     public float aimBlendSpeed = 12f;
-    public int aimLayerIndex = 2;
+    public int aimLayerIndex = 1;
 
     [Header("Hover Settings")]
-    public float hoverMaxDuration = 20f;
+    public float hoverMaxDuration = 50f;
     public float hoverVelocityDecayRate = 35f; // How fast velocity decays to zero
     public float hoverBobAmplitude = 0.3f; // How much the character bobs up/down
     public float hoverBobFrequency = 1.5f; // Speed of the bob oscillation
@@ -56,15 +61,22 @@ public class PilotTypeController : MonoBehaviour
     [HideInInspector] public float hoverTimeRemaining;
 
     [Header("Flight Settings")]
-    public float flightSpeed = 34f;
-    public float flightAcceleration = 8f;
-    public float pitchSpeed = 180f;
-    public float yawSpeed = 180f;
-    public float flightMaxDuration = 20f;
+    public float flightSpeed = 54f;
+    public float flightAcceleration = 12f;
+    public float pitchSpeed = 280f;
+    public float yawSpeed = 280f;
+    public float flightMaxDuration = 120f;
     public float flightControllerHeight = 0.2f;
     public Transform controllerPoint; // Optional: point to center the small collider on
     public Transform meshRoot; // For countering animation root motion during flight
     [HideInInspector] public float flightTimeRemaining;
+
+    [Header("Flight Control Options")]
+    public bool invertFlightPitch = true;
+    [Tooltip("How fast keyboard input ramps up to full value (NFS-style smooth steering)")]
+    public float keyboardFlightRampUpSpeed = 2.5f;
+    [Tooltip("How fast keyboard input ramps back to zero when released")]
+    public float keyboardFlightRampDownSpeed = 4f;
 
     [HideInInspector] public Pilot1 input;
     [HideInInspector] public Vector2 moveInput;
@@ -74,7 +86,7 @@ public class PilotTypeController : MonoBehaviour
     [HideInInspector] public bool sprintPressed;
     [HideInInspector] public bool launchHeld;
     [HideInInspector] public bool hoverHeld;
-    
+
     // Analog trigger values (0-1 range)
     [HideInInspector] public float launchTriggerValue; // R2 - flight speed control
     [HideInInspector] public float hoverTriggerValue;  // L2 - hover altitude control
@@ -85,6 +97,9 @@ public class PilotTypeController : MonoBehaviour
     [HideInInspector] public float defaultHeight;
     [HideInInspector] public Vector3 defaultCenter;
 
+    /// <summary>Shared platform tracker used by all grounded states.</summary>
+    public MovingPlatformHandler platformHandler { get; private set; }
+
     public FreeWalkState FreeWalkState { get; private set; }
     public AimWalkState AimWalkState { get; private set; }
     public JumpPilotState JumpPilotState { get; private set; }
@@ -92,12 +107,14 @@ public class PilotTypeController : MonoBehaviour
     public HoverPilotState HoverPilotState { get; private set; }
     public FlightPilotState FlightPilotState { get; private set; }
 
+
     void Awake()
     {
         controller = GetComponent<CharacterController>();
         cam = Camera.main.transform;
         animator = GetComponent<Animator>();
         input = new Pilot1();
+        platformHandler = new MovingPlatformHandler();
 
         FreeWalkState = new FreeWalkState(this);
         AimWalkState = new AimWalkState(this);
@@ -108,11 +125,27 @@ public class PilotTypeController : MonoBehaviour
     }
 
     void OnEnable() => input.Enable();
-    void OnDisable() => input.Disable();
-    void OnDestroy() => input.Dispose();
+    void OnDisable()
+    {
+        input.Disable();
+        // Restore cursor when disabled
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+    void OnDestroy()
+    {
+        input.Dispose();
+        // Restore cursor when destroyed
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
 
     void Start()
     {
+        // Lock and hide cursor for gameplay
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
         defaultHeight = controller.height;
         defaultCenter = controller.center;
         hoverTimeRemaining = hoverMaxDuration;
@@ -126,7 +159,7 @@ public class PilotTypeController : MonoBehaviour
     {
         ReadInput();
         currentState?.Tick();
-        
+
         if (landingCooldown > 0f)
         {
             landingCooldown -= Time.deltaTime;
@@ -150,35 +183,35 @@ public class PilotTypeController : MonoBehaviour
         // Read analog trigger values from input actions (preserves analog pressure)
         launchTriggerValue = input.PlayerA.Launch.ReadValue<float>();
         hoverTriggerValue = input.PlayerA.Hover.ReadValue<float>();
-        
+
         // Detect if using gamepad - check multiple controls to properly detect device
         var moveControl = input.PlayerA.Move.activeControl;
         var launchControl = input.PlayerA.Launch.activeControl;
         var hoverControl = input.PlayerA.Hover.activeControl;
-        
+
         bool moveIsGamepad = moveControl != null && moveControl.device is UnityEngine.InputSystem.Gamepad;
         bool launchIsGamepad = launchControl != null && launchControl.device is UnityEngine.InputSystem.Gamepad;
         bool hoverIsGamepad = hoverControl != null && hoverControl.device is UnityEngine.InputSystem.Gamepad;
-        
+
         isUsingGamepad = moveIsGamepad || launchIsGamepad || hoverIsGamepad;
-        
+
         // Keyboard gives 0 or 1 for hover (binary), gamepad gives 0-1 analog range
         // For keyboard hover, use 0.5 as neutral hover position to maintain altitude
         if (!hoverIsGamepad && hoverTriggerValue > 0f)
         {
             hoverTriggerValue = 0.5f; // Neutral hover for keyboard
         }
-        
+
         // Determine if triggers are held (threshold for activation)
         launchHeld = launchTriggerValue > 0.1f;
         hoverHeld = hoverTriggerValue > 0.1f;
-        
+
         // Debug: Show trigger values when in hover or flight state
         if (currentState == HoverPilotState || currentState == FlightPilotState)
         {
             Debug.Log($"L2 (Hover): {hoverTriggerValue:F2} | R2 (Launch): {launchTriggerValue:F2} | HoverIsGamepad: {hoverIsGamepad}");
         }
-        
+
         // Apply deadzone to stick input
         if (moveInput.magnitude < stickDeadzone)
         {
@@ -217,6 +250,7 @@ public class PilotTypeController : MonoBehaviour
         followCam.Priority = 10;
         aimCam.Priority = 10;
         flightCam.Priority = 10;
+        if (aimFlightCam != null) aimFlightCam.Priority = 10;
         activeCamera.Priority = 20;
     }
 
@@ -294,7 +328,7 @@ public class PilotTypeController : MonoBehaviour
         }
     }
 
-        public void ApplyJumpForce()
+    public void ApplyJumpForce()
     {
         velocity.y = 10f;
         //Debug.Log("Force has been applied");
@@ -331,9 +365,17 @@ public class FreeWalkState : IPilotState
 
     public void Enter()
     {
+        // CRITICAL: Reset ALL animator bools to prevent state conflicts
         ptC.animator.SetBool("IsAiming", false);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsHovering", false);
+        ptC.animator.SetBool("IsFlying", false); // Must explicitly set false!
+
+        // Reset flight and hover blend parameters
+        ptC.animator.SetFloat("FlightX", 0f);
+        ptC.animator.SetFloat("FlightY", 0f);
+        ptC.animator.SetFloat("HoverX", 0f);
+        ptC.animator.SetFloat("HoverY", 0f);
 
         ptC.controller.height = ptC.defaultHeight;
         ptC.controller.center = ptC.defaultCenter;
@@ -344,6 +386,21 @@ public class FreeWalkState : IPilotState
 
     public void Tick()
     {
+        // 1. Detect platform and compute position + rotation deltas
+        ptC.platformHandler.UpdateBeforeMove(
+            ptC.transform,
+            ptC.groundCheckPoint.position,
+            ptC.groundLayerMask);
+
+        Vector3 platformDelta = ptC.platformHandler.PositionDelta;
+        float platformYaw = ptC.platformHandler.YawDelta;
+
+        // Apply platform yaw BEFORE any other rotation so the player orbits with the platform
+        if (Mathf.Abs(platformYaw) > 0.001f)
+        {
+            ptC.transform.Rotate(0f, platformYaw, 0f, Space.World);
+        }
+
         // Transition to fall state if not grounded
         if (!ptC.isGrounded)
         {
@@ -351,17 +408,17 @@ public class FreeWalkState : IPilotState
             return;
         }
 
-        // During landing recovery - no movement, no state transitions
+        // During landing recovery — no movement input, but keep riding the platform
         if (ptC.landingCooldown > 0f)
         {
-            // Force idle animation during landing
             ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, 0f, Time.deltaTime * ptC.animatorLerpRate);
             ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, 0f, Time.deltaTime * ptC.animatorLerpRate);
             ptC.animator.SetFloat("MoveX", ptC.smoothMoveX);
             ptC.animator.SetFloat("MoveY", ptC.smoothMoveY);
-            
-            // Only apply gravity, no horizontal movement
-            ptC.controller.Move(ptC.velocity * Time.deltaTime);
+
+            // platformDelta is already a world-space offset — do NOT multiply by deltaTime
+            ptC.controller.Move(ptC.velocity * Time.deltaTime + platformDelta);
+            ptC.platformHandler.UpdateAfterMove(ptC.transform);
             return;
         }
 
@@ -369,7 +426,6 @@ public class FreeWalkState : IPilotState
 
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
 
-        // Sprint logic: Both keyboard and gamepad use Sprint button
         isSprinting = ptC.sprintPressed && ptC.isGrounded && ptC.moveInput.magnitude > 0.01f;
 
         if (moveDir.sqrMagnitude > 0.01f)
@@ -382,45 +438,34 @@ public class FreeWalkState : IPilotState
             );
         }
 
-        if (isSprinting && ptC.moveInput.magnitude > 0.01f)
-        {
-            forwardSpeed = 1.5f;
-        }
-        else
-        {
-            forwardSpeed = ptC.moveInput.magnitude;
-        }
+        forwardSpeed = isSprinting && ptC.moveInput.magnitude > 0.01f ? 1.5f : ptC.moveInput.magnitude;
 
         ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, 0f, Time.deltaTime * ptC.animatorLerpRate);
         ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, forwardSpeed, Time.deltaTime * ptC.animatorLerpRate);
-
         ptC.animator.SetFloat("MoveX", ptC.smoothMoveX);
         ptC.animator.SetFloat("MoveY", ptC.smoothMoveY);
 
-        // Movement in Tick for smooth high-framerate rendering
         float currentSpeed = isSprinting ? ptC.sprintSpeed : ptC.moveSpeed;
         Vector3 horizontalMove = moveDir * currentSpeed * Time.deltaTime;
         Vector3 verticalMove = ptC.velocity * Time.deltaTime;
-        ptC.controller.Move(horizontalMove + verticalMove);
+
+        // platformDelta is already a world-space offset — do NOT multiply by deltaTime
+        ptC.controller.Move(horizontalMove + verticalMove + platformDelta);
+        ptC.platformHandler.UpdateAfterMove(ptC.transform);
     }
 
-    public void FixedTick()
-    {
-        // Physics calculations only
-        ptC.ApplyGravity();
-        
-        // Regenerate hover and flight time while grounded
-        ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
-        ptC.flightTimeRemaining = Mathf.MoveTowards(ptC.flightTimeRemaining, ptC.flightMaxDuration, Time.fixedDeltaTime * 5f);
-    }
-
-    public void Exit()
-    {
-        isSprinting = false;
-    }
-
+public void FixedTick()
+{
+    ptC.ApplyGravity();
+    ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
+    ptC.flightTimeRemaining = Mathf.MoveTowards(ptC.flightTimeRemaining, ptC.flightMaxDuration, Time.fixedDeltaTime * 5f);
 }
 
+public void Exit()
+{
+    isSprinting = false;
+}
+}
 
 public class AimWalkState : IPilotState
 {
@@ -434,9 +479,18 @@ public class AimWalkState : IPilotState
     public void Enter()
     {
         Debug.Log("Entered: AimWalkState");
+
+        // CRITICAL: Reset ALL animator bools to prevent state conflicts
         ptC.animator.SetBool("IsAiming", true);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsHovering", false);
+        ptC.animator.SetBool("IsFlying", false); // Must explicitly set false!
+
+        // Reset flight and hover blend parameters
+        ptC.animator.SetFloat("FlightX", 0f);
+        ptC.animator.SetFloat("FlightY", 0f);
+        ptC.animator.SetFloat("HoverX", 0f);
+        ptC.animator.SetFloat("HoverY", 0f);
 
         ptC.controller.height = ptC.defaultHeight;
         ptC.controller.center = ptC.defaultCenter;
@@ -446,6 +500,21 @@ public class AimWalkState : IPilotState
 
     public void Tick()
     {
+        // 1. Detect platform and compute position + rotation deltas
+        ptC.platformHandler.UpdateBeforeMove(
+            ptC.transform,
+            ptC.groundCheckPoint.position,
+            ptC.groundLayerMask);
+
+        Vector3 platformDelta = ptC.platformHandler.PositionDelta;
+        float platformYaw = ptC.platformHandler.YawDelta;
+
+        // Apply platform yaw before aim rotation (aim Slerp will blend on top)
+        if (Mathf.Abs(platformYaw) > 0.001f)
+        {
+            ptC.transform.Rotate(0f, platformYaw, 0f, Space.World);
+        }
+
         // Transition to fall state if not grounded
         if (!ptC.isGrounded)
         {
@@ -456,7 +525,7 @@ public class AimWalkState : IPilotState
         // Declare camForward at method scope for reuse
         Vector3 camForward;
 
-        // During landing recovery - no movement, no state transitions
+        // During landing recovery — no movement input, but keep riding the platform
         if (ptC.landingCooldown > 0f)
         {
             // Still allow aim rotation during landing
@@ -471,15 +540,16 @@ public class AimWalkState : IPilotState
                     Time.deltaTime * ptC.aimRotationSpeed
                 );
             }
-            
+
             // Force idle animation during landing
             ptC.smoothMoveX = Mathf.Lerp(ptC.smoothMoveX, 0f, Time.deltaTime * ptC.animatorLerpRate);
             ptC.smoothMoveY = Mathf.Lerp(ptC.smoothMoveY, 0f, Time.deltaTime * ptC.animatorLerpRate);
             ptC.animator.SetFloat("AimWalkX", ptC.smoothMoveX);
             ptC.animator.SetFloat("AimWalkY", ptC.smoothMoveY);
-            
-            // Only apply gravity, no horizontal movement
-            ptC.controller.Move(ptC.velocity * Time.deltaTime);
+
+            // platformDelta is already a world-space offset — do NOT multiply by deltaTime
+            ptC.controller.Move(ptC.velocity * Time.deltaTime + platformDelta);
+            ptC.platformHandler.UpdateAfterMove(ptC.transform);
             return;
         }
 
@@ -511,14 +581,17 @@ public class AimWalkState : IPilotState
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
         Vector3 horizontalMove = moveDir * ptC.moveSpeed * Time.deltaTime;
         Vector3 verticalMove = ptC.velocity * Time.deltaTime;
-        ptC.controller.Move(horizontalMove + verticalMove);
+
+        // platformDelta is already a world-space offset — do NOT multiply by deltaTime
+        ptC.controller.Move(horizontalMove + verticalMove + platformDelta);
+        ptC.platformHandler.UpdateAfterMove(ptC.transform);
     }
 
     public void FixedTick()
     {
         // Physics calculations only
         ptC.ApplyGravity();
-        
+
         // Regenerate hover and flight time while grounded
         ptC.hoverTimeRemaining = Mathf.MoveTowards(ptC.hoverTimeRemaining, ptC.hoverMaxDuration, Time.fixedDeltaTime * 5f);
         ptC.flightTimeRemaining = Mathf.MoveTowards(ptC.flightTimeRemaining, ptC.flightMaxDuration, Time.fixedDeltaTime * 5f);
@@ -544,6 +617,7 @@ public class JumpPilotState : IPilotState
 
     public void Enter()
     {
+        ptC.platformHandler.ClearPlatform();
         Debug.Log("Entered: JumpWalkState");
         hasAppliedJumpForce = false;
         ptC.animator.SetTrigger("Jump");
@@ -611,7 +685,7 @@ public class JumpPilotState : IPilotState
         {
             ptC.ChangeState(ptC.FallPilotState);
             return;
-        } 
+        }
     }
 
     public void Exit()
@@ -626,6 +700,9 @@ public class FallPilotState : IPilotState
 {
     private readonly PilotTypeController ptC;
     private float fallTime;
+    private float landingCheckDistance = 1.5f;
+    private float landRotateSpeed = 8f;
+    private bool isLanding;
 
     public FallPilotState(PilotTypeController controller)
     {
@@ -634,14 +711,23 @@ public class FallPilotState : IPilotState
 
     public void Enter()
     {
+        ptC.platformHandler.ClearPlatform();
         fallTime = 0f;
+        isLanding = false;
         Debug.Log("Entered: FallWalkState");
+
+        // CRITICAL: Reset ALL animator bools to prevent state conflicts
         ptC.animator.SetBool("IsFalling", true);
         ptC.animator.SetBool("IsAiming", false);
         ptC.animator.SetBool("IsHovering", false);
+        ptC.animator.SetBool("IsFlying", false); // Must explicitly set false!
+
+        // Reset flight blend parameters
+        ptC.animator.SetFloat("FlightX", 0f);
+        ptC.animator.SetFloat("FlightY", 0f);
 
         ptC.SetCameraPriority(ptC.followCam);
-        
+
         // Set a small grace time if we don't already have one (walking off ledge)
         if (ptC.airborneGraceTime <= 0f)
         {
@@ -652,6 +738,7 @@ public class FallPilotState : IPilotState
     public void Exit()
     {
         ptC.animator.SetBool("IsFalling", false);
+        isLanding = false;
         // Note: Landing animations are now triggered by ground states on entry
         // This prevents false landings when transitioning to hover
     }
@@ -665,16 +752,16 @@ public class FallPilotState : IPilotState
     public void Tick()
     {
         fallTime += Time.deltaTime;
-        
+
         // Decrement grace time
         if (ptC.airborneGraceTime > 0f)
         {
             ptC.airborneGraceTime -= Time.deltaTime;
         }
 
-        // Rotation
+        // Rotation towards movement direction (only if not close to landing)
         Vector3 moveDir = ptC.GetCameraRelativeMovement();
-        if (moveDir.sqrMagnitude > 0.01f)
+        if (moveDir.sqrMagnitude > 0.01f && !isLanding)
         {
             Quaternion targetRotation = Quaternion.LookRotation(moveDir);
             ptC.transform.rotation = Quaternion.RotateTowards(
@@ -703,13 +790,83 @@ public class FallPilotState : IPilotState
             return;
         }
 
-        // Check for landing - only after grace period and with downward velocity
-        if (ptC.isGrounded && ptC.airborneGraceTime <= 0f && ptC.velocity.y <= 0f)
+        // Check for landing with perpendicular rotation
+        CheckForLanding();
+    }
+
+    private void CheckForLanding()
+    {
+        // Only check after grace period
+        if (ptC.airborneGraceTime > 0f) return;
+
+        if (!isLanding)
         {
-            // Trigger landing animation before state change
+            RaycastHit hit;
+            if (Physics.Raycast(ptC.controller.transform.position, Vector3.down, out hit, landingCheckDistance, ptC.groundLayerMask))
+            {
+                Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.cyan);
+
+                // Calculate target rotation to be fully upright
+                Vector3 projectedForward = ptC.transform.forward;
+                projectedForward.y = 0f;
+
+                if (projectedForward.sqrMagnitude < 0.01f)
+                {
+                    // If looking straight up/down, use right vector instead
+                    projectedForward = ptC.transform.right;
+                    projectedForward.y = 0f;
+                }
+                projectedForward.Normalize();
+
+                Quaternion targetRotation = Quaternion.LookRotation(projectedForward, Vector3.up);
+
+                // Rotate towards upright - faster when closer to ground
+                float distanceToGround = hit.distance;
+                float rotationMultiplier = Mathf.Lerp(3f, 1f, distanceToGround / landingCheckDistance);
+                ptC.transform.rotation = Quaternion.Slerp(ptC.transform.rotation, targetRotation, Time.deltaTime * landRotateSpeed * rotationMultiplier);
+
+                // Check if close enough to land
+                float angle = Vector3.Angle(ptC.transform.up, Vector3.up);
+                bool closeToGround = distanceToGround < 0.6f;
+                bool isNearlyUpright = angle < 20f;
+
+                if (closeToGround && isNearlyUpright && ptC.velocity.y <= 0f)
+                {
+                    isLanding = true;
+
+                    // Snap to fully upright before transitioning
+                    ptC.transform.rotation = targetRotation;
+
+                    ptC.TriggerLanding(ptC.velocity.y);
+
+                    if (ptC.aimHeld)
+                        ptC.ChangeState(ptC.AimWalkState);
+                    else
+                        ptC.ChangeState(ptC.FreeWalkState);
+                }
+            }
+            else
+            {
+                Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.blue);
+            }
+        }
+
+        // Fallback: Also check if grounded via controller (for edges/slopes)
+        if (ptC.isGrounded && ptC.velocity.y <= 0f && !isLanding)
+        {
+            isLanding = true;
+
+            // Snap to upright
+            Vector3 projectedForward = ptC.transform.forward;
+            projectedForward.y = 0f;
+            if (projectedForward.sqrMagnitude > 0.01f)
+            {
+                projectedForward.Normalize();
+                ptC.transform.rotation = Quaternion.LookRotation(projectedForward, Vector3.up);
+            }
+
             ptC.TriggerLanding(ptC.velocity.y);
-            
-            // Transition to appropriate ground state
+
             if (ptC.aimHeld)
                 ptC.ChangeState(ptC.AimWalkState);
             else
@@ -734,6 +891,7 @@ public class HoverPilotState : IPilotState
 
     public void Enter()
     {
+        ptC.platformHandler.ClearPlatform();
         Debug.Log("Entered: HoverState");
         hoverBobTimer = 0f;
         hasStabilized = false;
@@ -741,9 +899,20 @@ public class HoverPilotState : IPilotState
         baseHoverHeight = ptC.transform.position.y;
         currentAimLayerWeight = ptC.animator.GetLayerWeight(1); // Get current weight
 
+        // CRITICAL: Reset ALL animator bools to prevent state conflicts
         ptC.animator.SetBool("IsHovering", true);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsAiming", false);
+        ptC.animator.SetBool("IsFlying", false); // Must explicitly set false!
+
+        // Reset flight and walk blend parameters
+        ptC.animator.SetFloat("FlightX", 0f);
+        ptC.animator.SetFloat("FlightY", 0f);
+        ptC.animator.SetFloat("MoveX", 0f);
+        ptC.animator.SetFloat("MoveY", 0f);
+        ptC.animator.SetFloat("AimWalkX", 0f);
+        ptC.animator.SetFloat("AimWalkY", 0f);
+
         ptC.animator.SetTrigger("HoverStart");
         ptC.SetCameraPriority(ptC.aimCam);
     }
@@ -771,7 +940,7 @@ public class HoverPilotState : IPilotState
             // Rapidly decay vertical velocity to stabilize - use very aggressive decay
             float verticalDecay = decayFactor * 4f; // 4x decay rate for vertical
             ptC.velocity.y = Mathf.MoveTowards(ptC.velocity.y, 0f, verticalDecay);
-            
+
             // Check if velocity has stabilized (near zero)
             if (Mathf.Abs(ptC.velocity.y) < 0.5f && Mathf.Abs(ptC.velocity.x) < 0.5f && Mathf.Abs(ptC.velocity.z) < 0.5f)
             {
@@ -785,7 +954,7 @@ public class HoverPilotState : IPilotState
             float triggerValue = ptC.hoverTriggerValue;
             float neutralZoneLow = 0.55f;
             float neutralZoneHigh = 0.85f;
-            
+
             if (triggerValue < neutralZoneLow)
             {
                 // Descending - map 0.55 to 0 => 0 to -1 vertical input
@@ -807,7 +976,7 @@ public class HoverPilotState : IPilotState
                 // Neutral zone - apply bob effect
                 hoverBobTimer += Time.fixedDeltaTime;
                 float bobOffset = Mathf.Sin(hoverBobTimer * ptC.hoverBobFrequency * Mathf.PI * 2f) * ptC.hoverBobAmplitude;
-                
+
                 // Calculate bob velocity to maintain smooth oscillation
                 float targetY = baseHoverHeight + bobOffset;
                 float currentY = ptC.transform.position.y;
@@ -870,21 +1039,28 @@ public class HoverPilotState : IPilotState
             {
                 // Store velocity before resetting for landing animation
                 float landingVelocity = ptC.velocity.y;
-                
+
                 // Reset velocity before transitioning - prevents carrying fall speed
                 ptC.velocity = Vector3.zero;
-                
+
                 // Trigger landing animation based on how fast we were falling
                 ptC.TriggerLanding(landingVelocity);
                 Debug.Log("TriggerLanding in Hover with velocity: " + landingVelocity);
-                
+
                 if (ptC.aimHeld)
                     ptC.ChangeState(ptC.AimWalkState);
                 else
                     ptC.ChangeState(ptC.FreeWalkState);
                 return;
             }
-            
+
+            // Transition to flight if launch is pressed (prevents hover->fall->flight cycle)
+            if (ptC.launchHeld && ptC.flightTimeRemaining > 0f)
+            {
+                ptC.ChangeState(ptC.FlightPilotState);
+                return;
+            }
+
             // Exit if hover button released or time expired
             if (!ptC.hoverHeld || ptC.hoverTimeRemaining <= 0f)
             {
@@ -906,6 +1082,13 @@ public class FlightPilotState : IPilotState
     private float landingCheckDistance = 1.2f;
     private bool isLanding;
 
+    // NFS-style smoothed keyboard input (interpolates binary 0/1 to feel like analog)
+    private float smoothedPitchInput;
+    private float smoothedYawInput;
+
+    // Aim layer blending (like HoverPilotState)
+    private float currentAimLayerWeight;
+
     public FlightPilotState(PilotTypeController controller)
     {
         ptC = controller;
@@ -913,6 +1096,7 @@ public class FlightPilotState : IPilotState
 
     public void Enter()
     {
+        ptC.platformHandler.ClearPlatform();
         Debug.Log("Entered: FlightPilotState");
         currentFlightSpeed = 0f;
         currentPitch = 0f;
@@ -931,15 +1115,36 @@ public class FlightPilotState : IPilotState
             ptC.controller.center = new Vector3(0, 0.1f, 0);
         }
 
-        // Set animator states
+        // CRITICAL: Reset ALL animator bools to prevent state conflicts
+        // This fixes the "walking in air" bug when rapidly switching states
         ptC.animator.SetBool("IsFlying", true);
         ptC.animator.SetBool("IsFalling", false);
         ptC.animator.SetBool("IsHovering", false);
         ptC.animator.SetBool("IsAiming", false);
+
+        // Reset movement blend parameters to prevent carrying over walk animation values
+        ptC.animator.SetFloat("MoveX", 0f);
+        ptC.animator.SetFloat("MoveY", 0f);
+        ptC.animator.SetFloat("AimWalkX", 0f);
+        ptC.animator.SetFloat("AimWalkY", 0f);
+        ptC.animator.SetFloat("HoverX", 0f);
+        ptC.animator.SetFloat("HoverY", 0f);
+
         ptC.animator.SetTrigger("FlightStart");
-        
+
         // Clear velocity - flight controls movement directly
         ptC.velocity = Vector3.zero;
+
+        // Reset smooth move values on controller
+        ptC.smoothMoveX = 0f;
+        ptC.smoothMoveY = 0f;
+
+        // Reset smoothed keyboard input
+        smoothedPitchInput = 0f;
+        smoothedYawInput = 0f;
+
+        // Initialize aim layer weight (like HoverPilotState)
+        currentAimLayerWeight = ptC.animator.GetLayerWeight(1);
 
         ptC.SetCameraPriority(ptC.flightCam);
     }
@@ -956,6 +1161,9 @@ public class FlightPilotState : IPilotState
         ptC.animator.SetFloat("FlightX", 0f);
         ptC.animator.SetFloat("FlightY", 0f);
 
+        // Reset aim layer weight on exit (like HoverPilotState)
+        ptC.animator.SetLayerWeight(1, 0f);
+
         // Reset flight speed
         currentFlightSpeed = 0f;
         isLanding = false;
@@ -968,10 +1176,38 @@ public class FlightPilotState : IPilotState
         // Calculate speed-based turn resistance (0 = full agility, 1 = max resistance)
         float speedFactor = Mathf.Clamp01(currentFlightSpeed / ptC.flightSpeed);
         float turnResistance = Mathf.Lerp(1f, 0.3f, speedFactor); // At max speed, 70% harder to turn
-        
-        // PITCH & YAW CONTROL from input with speed-based resistance
-        float targetPitch = ptC.moveInput.y * ptC.pitchSpeed * turnResistance;
-        float targetYaw = ptC.moveInput.x * ptC.yawSpeed * turnResistance;
+
+        // NFS-style input smoothing for keyboard (binary input feels like analog)
+        // For gamepad: use raw analog input directly
+        // For keyboard: smoothly interpolate towards target, creating steering ramp
+        float rawPitchInput = ptC.invertFlightPitch ? -ptC.moveInput.y : ptC.moveInput.y;
+        float rawYawInput = ptC.moveInput.x;
+
+        if (ptC.isUsingGamepad)
+        {
+            // Gamepad already has analog input, use directly
+            smoothedPitchInput = rawPitchInput;
+            smoothedYawInput = rawYawInput;
+        }
+        else
+        {
+            // Keyboard: NFS 2013 style - ramp up when pressing, ramp down when releasing
+            // When pressing opposite direction (e.g., left while fully right), use ramp up speed
+            // for responsive counter-steering
+            float pitchRampSpeed = Mathf.Abs(rawPitchInput) > 0.01f
+                ? ptC.keyboardFlightRampUpSpeed
+                : ptC.keyboardFlightRampDownSpeed;
+            float yawRampSpeed = Mathf.Abs(rawYawInput) > 0.01f
+                ? ptC.keyboardFlightRampUpSpeed
+                : ptC.keyboardFlightRampDownSpeed;
+
+            smoothedPitchInput = Mathf.MoveTowards(smoothedPitchInput, rawPitchInput, pitchRampSpeed * Time.fixedDeltaTime);
+            smoothedYawInput = Mathf.MoveTowards(smoothedYawInput, rawYawInput, yawRampSpeed * Time.fixedDeltaTime);
+        }
+
+        // PITCH & YAW CONTROL using smoothed input with speed-based resistance
+        float targetPitch = smoothedPitchInput * ptC.pitchSpeed * turnResistance;
+        float targetYaw = smoothedYawInput * ptC.yawSpeed * turnResistance;
 
         // Smooth rotation changes
         currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.fixedDeltaTime * 5f);
@@ -1006,23 +1242,22 @@ public class FlightPilotState : IPilotState
 
         // Update animator blend tree parameters
         // FlightX = yaw (left/right), FlightY = pitch (up/down forward motion)
-        float smoothX = Mathf.Lerp(ptC.animator.GetFloat("FlightX"), ptC.moveInput.x, Time.deltaTime * ptC.animatorLerpRate);
-        float smoothY = Mathf.Lerp(ptC.animator.GetFloat("FlightY"), ptC.moveInput.y, Time.deltaTime * ptC.animatorLerpRate);
+        // Use smoothed input values so animations match the smoothed steering
+        float smoothX = Mathf.Lerp(ptC.animator.GetFloat("FlightX"), smoothedYawInput, Time.deltaTime * ptC.animatorLerpRate);
+        float smoothY = Mathf.Lerp(ptC.animator.GetFloat("FlightY"), smoothedPitchInput, Time.deltaTime * ptC.animatorLerpRate);
         smoothX = Mathf.Clamp(smoothX, -1f, 1f);
         smoothY = Mathf.Clamp(smoothY, -1f, 1f);
         ptC.animator.SetFloat("FlightX", smoothX);
         ptC.animator.SetFloat("FlightY", smoothY);
-        //Debug.Log($"FlightX:"+ smoothX + " ,FlightY:" + smoothY );
+
+        // Smoothly blend aim layer based on aimHeld (like HoverPilotState)
+        // This allows aiming while flying without changing state
+        float targetAimWeight = ptC.aimHeld ? 1f : 0f;
+        currentAimLayerWeight = Mathf.Lerp(currentAimLayerWeight, targetAimWeight, Time.deltaTime * ptC.aimBlendSpeed);
+        ptC.animator.SetLayerWeight(1, currentAimLayerWeight);
 
         // Check for landing - use raycast to detect ground proximity
         CheckForLanding();
-
-        // Counter animation root motion on meshRoot during flight
-        if (ptC.meshRoot != null)
-        {
-            ptC.meshRoot.localPosition = Vector3.zero;
-            ptC.meshRoot.localRotation = Quaternion.identity;
-        }
 
         // Exit conditions (only after grace period)
         if (stabilizeGraceTime <= 0f)
@@ -1043,9 +1278,10 @@ public class FlightPilotState : IPilotState
         }
     }
 
+    
     private void CheckForLanding()
     {
-        
+
         if (!isLanding)
         {
             RaycastHit hit;
@@ -1054,33 +1290,45 @@ public class FlightPilotState : IPilotState
                 Debug.DrawRay(ptC.controller.transform.position, Vector3.down * landingCheckDistance, Color.red);
                 Debug.DrawRay(hit.point, hit.normal * 0.6f, Color.yellow);
 
-                // Calculate target rotation: Character should rotate to be upright relative to ground
+                // Calculate target rotation: Character should rotate to be fully upright (perpendicular to ground)
                 Vector3 currentForward = ptC.transform.forward;
-                Vector3 groundUp = hit.normal;
+                Vector3 groundUp = Vector3.up; // Use world up for flat ground alignment
 
-                // Project forward onto the ground plane to maintain facing direction
-                Vector3 projectedForward = Vector3.ProjectOnPlane(currentForward, groundUp).normalized;
+                // Project forward onto the horizontal plane to maintain facing direction
+                Vector3 projectedForward = currentForward;
+                projectedForward.y = 0f;
+                projectedForward.Normalize();
+
                 if (projectedForward.sqrMagnitude < 0.01f)
                 {
-                    projectedForward = Vector3.ProjectOnPlane(ptC.transform.right, groundUp).normalized;
+                    // If looking straight up/down, use right vector instead
+                    projectedForward = ptC.transform.right;
+                    projectedForward.y = 0f;
+                    projectedForward.Normalize();
                 }
 
                 Quaternion targetRotation = Quaternion.LookRotation(projectedForward, groundUp);
 
-                // Rotate the main transform towards upright position
-                ptC.transform.rotation = Quaternion.Slerp(ptC.transform.rotation, targetRotation, Time.deltaTime * landRotateSpeed);
-
-                // Check angle between current up and target up
-                float angle = Vector3.Angle(ptC.transform.up, groundUp);
-                Debug.Log($"Angle of Pilot: " + angle);
-                // Trigger landing when close enough to ground and nearly upright
+                // Rotate the main transform towards upright position - use faster rotation when closer to ground
                 float distanceToGround = hit.distance;
+                float rotationMultiplier = Mathf.Lerp(3f, 1f, distanceToGround / landingCheckDistance);
+                ptC.transform.rotation = Quaternion.Slerp(ptC.transform.rotation, targetRotation, Time.deltaTime * landRotateSpeed * rotationMultiplier);
+
+                // Check angle between current up and world up (perpendicular check)
+                float angle = Vector3.Angle(ptC.transform.up, Vector3.up);
+                Debug.Log($"Angle of Pilot: " + angle);
+
+                // Trigger landing when close enough to ground and nearly upright
                 bool closeToGround = distanceToGround < 0.8f;
                 bool isNearlyUpright = angle < 15f;
 
                 if (closeToGround && isNearlyUpright)
                 {
                     isLanding = true;
+
+                    // Snap to fully upright before transitioning
+                    ptC.transform.rotation = targetRotation;
+
                     ptC.TriggerLanding(ptC.velocity.y);
 
                     // Transition to appropriate ground state
@@ -1100,6 +1348,16 @@ public class FlightPilotState : IPilotState
         if (ptC.isGrounded && stabilizeGraceTime <= 0f)
         {
             isLanding = true;
+
+            // Snap to upright when landing via ground check
+            Vector3 projectedForward = ptC.transform.forward;
+            projectedForward.y = 0f;
+            if (projectedForward.sqrMagnitude > 0.01f)
+            {
+                projectedForward.Normalize();
+                ptC.transform.rotation = Quaternion.LookRotation(projectedForward, Vector3.up);
+            }
+
             ptC.TriggerLanding(ptC.velocity.y);
 
             if (ptC.aimHeld)
@@ -1107,5 +1365,7 @@ public class FlightPilotState : IPilotState
             else
                 ptC.ChangeState(ptC.FreeWalkState);
         }
+        
     }
+}
 }

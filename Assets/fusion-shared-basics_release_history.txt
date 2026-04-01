@@ -1,0 +1,8 @@
+# 2.0.5
+
+## Build 779 (Feb 24, 2025)
+
+**Changes**
+
+- Update to Fusion 2.0.5 Stable 920
+

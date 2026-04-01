@@ -1,0 +1,43 @@
+// Add prefix "sk_ue_" to all selected objects
+// Usage: Select objects in outliner, then run: source "AddPrefix.mel"; addPrefix_sk_ue();
+
+global proc addPrefix_sk_ue()
+{
+    string $selected[] = `ls -selection`;
+    
+    if (size($selected) == 0)
+    {
+        warning "No objects selected. Please select objects in the outliner first.";
+        return;
+    }
+    
+    string $obj;
+    int $renamed = 0;
+    
+    for ($obj in $selected)
+    {
+        // Get the current name
+        string $currentName = $obj;
+        
+        // Check if prefix already exists
+        if (startsWith($currentName, "sk_ue_"))
+        {
+            print ("Skipping '" + $currentName + "' - prefix already exists.\n");
+            continue;
+        }
+        
+        // Add prefix
+        string $newName = "sk_ue_" + $currentName;
+        
+        // Rename the object
+        rename $obj $newName;
+        
+        print ("Renamed: '" + $currentName + "' -> '" + $newName + "'\n");
+        $renamed++;
+    }
+    
+    print ("\n// Result: " + $renamed + " object(s) renamed with 'sk_ue_' prefix.\n");
+}
+
+// Run the function
+addPrefix_sk_ue();

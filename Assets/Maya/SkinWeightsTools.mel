@@ -1,0 +1,135 @@
+// Skin Weights Tools for Maya 2023
+// A simple UI with Paint Skin Weights and Remove Unused Influences buttons
+
+global proc SkinWeightsTools()
+{
+    // Check if window already exists and delete it
+    if (`window -exists SkinWeightsToolsWin`)
+    {
+        deleteUI SkinWeightsToolsWin;
+    }
+    
+    // Create the window
+    window -title "Skin Weights Tools" 
+           -widthHeight 250 120 
+           -sizeable true
+           SkinWeightsToolsWin;
+    
+    // Create main layout
+    columnLayout -adjustableColumn true -rowSpacing 10 -columnAttach "both" 15;
+    
+    // Add some spacing at top
+    separator -height 10 -style "none";
+    
+    // Paint Skin Weights button
+    button -label "Paint Skin Weights" 
+           -height 35
+           -backgroundColor 0.4 0.6 0.8
+           -command "paintSkinWeightsBtn";
+    
+    // Remove Unused Influences button
+    button -label "Remove Unused Influences" 
+           -height 35
+           -backgroundColor 0.8 0.5 0.4
+           -command "removeUnusedInfluencesBtn";
+    
+    // Add some spacing at bottom
+    separator -height 10 -style "none";
+    
+    // Show the window
+    showWindow SkinWeightsToolsWin;
+}
+
+// Paint Skin Weights procedure
+global proc paintSkinWeightsBtn()
+{
+    // Get the current selection
+    string $sel[] = `ls -selection`;
+    
+    if (size($sel) == 0)
+    {
+        warning "Please select a skinned mesh first.";
+        return;
+    }
+    
+    // Try to find skin cluster on selected object
+    string $skinCluster[] = `ls -type "skinCluster"`;
+    string $history[] = `listHistory $sel[0]`;
+    string $sc[] = `ls -type "skinCluster" $history`;
+    
+    if (size($sc) == 0)
+    {
+        warning "No skin cluster found on selected object. Please select a skinned mesh.";
+        return;
+    }
+    
+    // Enter paint skin weights mode
+    ArtPaintSkinWeightsTool;
+    print ("// Paint Skin Weights tool activated on: " + $sel[0] + "\n");
+}
+
+// Remove Unused Influences procedure
+global proc removeUnusedInfluencesBtn()
+{
+    // Get the current selection
+    string $sel[] = `ls -selection`;
+    
+    if (size($sel) == 0)
+    {
+        warning "Please select a skinned mesh first.";
+        return;
+    }
+    
+    // Process each selected object
+    int $totalRemoved = 0;
+    
+    for ($obj in $sel)
+    {
+        // Find skin cluster on the object
+        string $history[] = `listHistory $obj`;
+        string $sc[] = `ls -type "skinCluster" $history`;
+        
+        if (size($sc) == 0)
+        {
+            warning ("No skin cluster found on: " + $obj);
+            continue;
+        }
+        
+        string $skinClusterName = $sc[0];
+        
+        // Get all influences before removal
+        string $influencesBefore[] = `skinCluster -query -influence $skinClusterName`;
+        int $countBefore = size($influencesBefore);
+        
+        // Remove unused influences using Maya's built-in command
+        skinCluster -edit -removeUnusedInfluence $skinClusterName;
+        
+        // Get influences after removal
+        string $influencesAfter[] = `skinCluster -query -influence $skinClusterName`;
+        int $countAfter = size($influencesAfter);
+        
+        int $removedCount = $countBefore - $countAfter;
+        $totalRemoved += $removedCount;
+        
+        if ($removedCount > 0)
+        {
+            print ("// Removed " + $removedCount + " unused influences from: " + $obj + "\n");
+        }
+        else
+        {
+            print ("// No unused influences found on: " + $obj + "\n");
+        }
+    }
+    
+    if ($totalRemoved > 0)
+    {
+        print ("// Total unused influences removed: " + $totalRemoved + "\n");
+    }
+    else
+    {
+        print "// No unused influences found on any selected objects.\n";
+    }
+}
+
+// Run the tool
+SkinWeightsTools();

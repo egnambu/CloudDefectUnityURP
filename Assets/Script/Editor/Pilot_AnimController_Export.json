@@ -1,0 +1,1072 @@
+﻿{
+  "controllerName": "Pilot_AnimController",
+  "updateMode": "Normal",
+  "applyRootMotion": false,
+  "parameters": [
+    {
+      "name": "AimWalkX",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "AimWalkY",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "FlightStart",
+      "type": "Trigger",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "FlightX",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "FlightY",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "HeavyLanding",
+      "type": "Trigger",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "HoverStart",
+      "type": "Trigger",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "HoverX",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "HoverY",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "IsAiming",
+      "type": "Bool",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "IsFalling",
+      "type": "Bool",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "IsFlying",
+      "type": "Bool",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "IsGrounded",
+      "type": "Bool",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "IsHovering",
+      "type": "Bool",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "Jump",
+      "type": "Trigger",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "Landing",
+      "type": "Trigger",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "LightLanding",
+      "type": "Trigger",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "MoveX",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    },
+    {
+      "name": "MoveY",
+      "type": "Float",
+      "defaultFloat": 0,
+      "defaultInt": 0,
+      "defaultBool": false
+    }
+  ],
+  "layers": [
+    {
+      "name": "Movement",
+      "weight": 1,
+      "blendingMode": "Override",
+      "iKPass": false,
+      "stateMachine": {
+        "name": "Movement",
+        "defaultStateName": "Movement",
+        "states": [
+          {
+            "name": "Movement",
+            "motionType": "BlendTree",
+            "motionName": "Blend Tree",
+            "blendTree": {
+              "name": "Blend Tree",
+              "blendType": "FreeformCartesian2D",
+              "blendParameter": "MoveX",
+              "blendParameterY": "MoveY",
+              "useAutomaticThresholds": true,
+              "minThreshold": 0,
+              "maxThreshold": 1,
+              "children": [
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "TwinSword_Common_Idle",
+                  "threshold": 0,
+                  "position": { "x": 0, "y": 0 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "TwinSword_Common_Run_Loop",
+                  "threshold": 0.5,
+                  "position": { "x": 0, "y": 1 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "TwinSword_Common_Sprint",
+                  "threshold": 1,
+                  "position": { "x": 0, "y": 1.5 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                }
+              ]
+            },
+            "speed": 1,
+            "speedParameterActive": false,
+            "mirror": false,
+            "mirrorParameterActive": false,
+            "cycleOffset": 0,
+            "cycleOffsetParameterActive": false,
+            "footIK": false,
+            "writeDefaults": true,
+            "transitions": [
+              {
+                "sourceState": "Movement",
+                "destinationStateMachine": "Aim Walk",
+                "isExitTransition": false,
+                "hasExitTime": false,
+                "exitTime": 2.28278285E-08,
+                "hasFixedDuration": true,
+                "duration": 0.605977595,
+                "offset": 0,
+                "interruptionSource": "None",
+                "orderedInterruption": true,
+                "canTransitionToSelf": true,
+                "solo": false,
+                "mute": false,
+                "conditions": [
+                  {
+                    "parameter": "IsAiming",
+                    "mode": "If",
+                    "threshold": 0
+                  }
+                ]
+              },
+              {
+                "sourceState": "Movement",
+                "destinationState": "Fall",
+                "isExitTransition": false,
+                "hasExitTime": false,
+                "exitTime": 0,
+                "hasFixedDuration": true,
+                "duration": 0.277983755,
+                "offset": 0,
+                "interruptionSource": "None",
+                "orderedInterruption": true,
+                "canTransitionToSelf": true,
+                "solo": false,
+                "mute": false,
+                "conditions": [
+                  {
+                    "parameter": "IsFalling",
+                    "mode": "If",
+                    "threshold": 0
+                  }
+                ]
+              },
+              {
+                "sourceState": "Movement",
+                "destinationState": "Jump",
+                "isExitTransition": false,
+                "hasExitTime": false,
+                "exitTime": 0,
+                "hasFixedDuration": true,
+                "duration": 0.328637838,
+                "offset": 0,
+                "interruptionSource": "None",
+                "orderedInterruption": true,
+                "canTransitionToSelf": true,
+                "solo": false,
+                "mute": false,
+                "conditions": [
+                  {
+                    "parameter": "Jump",
+                    "mode": "If",
+                    "threshold": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "subStateMachines": [
+          {
+            "name": "Aim Walk",
+            "defaultStateName": "Aim Blend Tree",
+            "parentStateMachineName": "Movement",
+            "states": [
+              {
+                "name": "Aim Blend Tree",
+                "motionType": "BlendTree",
+                "motionName": "Blend Tree",
+                "blendTree": {
+                  "name": "Blend Tree",
+                  "blendType": "FreeformDirectional2D",
+                  "blendParameter": "AimWalkX",
+                  "blendParameterY": "AimWalkY",
+                  "useAutomaticThresholds": true,
+                  "minThreshold": 0,
+                  "maxThreshold": 1,
+                  "children": [
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_WalkFwd_Aim",
+                      "threshold": 0,
+                      "position": { "x": 0, "y": 1 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_WalkRight_Aim",
+                      "threshold": 0.166666672,
+                      "position": { "x": 0.5, "y": 0.5 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_WalkLeft_Aim",
+                      "threshold": 0.333333343,
+                      "position": { "x": -0.5, "y": 0.5 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_WalkBwd_Aim",
+                      "threshold": 0.5,
+                      "position": { "x": 0, "y": -1 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_WalkRight_Aim",
+                      "threshold": 0.666666687,
+                      "position": { "x": 0.5, "y": -0.5 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_WalkLeft_Aim",
+                      "threshold": 0.833333313,
+                      "position": { "x": -0.5, "y": -0.5 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "AS_Rifle_Aim",
+                      "threshold": 1,
+                      "position": { "x": 0, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    }
+                  ]
+                },
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Aim Blend Tree",
+                    "isExitTransition": true,
+                    "hasExitTime": false,
+                    "exitTime": 0,
+                    "hasFixedDuration": true,
+                    "duration": 0.573305726,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "IsAiming",
+                        "mode": "IfNot",
+                        "threshold": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Flight Machine",
+            "defaultStateName": "Flight Start",
+            "parentStateMachineName": "Movement",
+            "states": [
+              {
+                "name": "Flight Blend",
+                "motionType": "BlendTree",
+                "motionName": "Blend Tree",
+                "blendTree": {
+                  "name": "Blend Tree",
+                  "blendType": "FreeformDirectional2D",
+                  "blendParameter": "FlightX",
+                  "blendParameterY": "FlightY",
+                  "useAutomaticThresholds": true,
+                  "minThreshold": 0,
+                  "maxThreshold": 1,
+                  "children": [
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_FM_A_Lean_D",
+                      "threshold": 0,
+                      "position": { "x": 0, "y": 1.20000005 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_FM_A_Lean_L",
+                      "threshold": 0.25,
+                      "position": { "x": -1.20000005, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_FM_A_Lean_U",
+                      "threshold": 0.5,
+                      "position": { "x": 0, "y": -1.20000005 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_FM_A_Lean_R",
+                      "threshold": 0.75,
+                      "position": { "x": 1.20000005, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_Flight_FastMove_A",
+                      "threshold": 1,
+                      "position": { "x": 0, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    }
+                  ]
+                },
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Flight Blend",
+                    "isExitTransition": true,
+                    "hasExitTime": false,
+                    "exitTime": 1.57337148E-08,
+                    "hasFixedDuration": true,
+                    "duration": 0.18745409,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "IsFlying",
+                        "mode": "IfNot",
+                        "threshold": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Flight Start",
+                "motionType": "AnimationClip",
+                "motionName": "A_Flight_FastMove_Start_A",
+                "speed": 2,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Flight Start",
+                    "destinationState": "Flight Blend",
+                    "isExitTransition": false,
+                    "hasExitTime": true,
+                    "exitTime": 4.60963712E-09,
+                    "hasFixedDuration": true,
+                    "duration": 0.488779932,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Hover Machine",
+            "defaultStateName": "Hover Start",
+            "parentStateMachineName": "Movement",
+            "states": [
+              {
+                "name": "Hover Blend",
+                "motionType": "BlendTree",
+                "motionName": "Blend Tree",
+                "blendTree": {
+                  "name": "Blend Tree",
+                  "blendType": "FreeformDirectional2D",
+                  "blendParameter": "HoverX",
+                  "blendParameterY": "HoverY",
+                  "useAutomaticThresholds": true,
+                  "minThreshold": 0,
+                  "maxThreshold": 1,
+                  "children": [
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_Flight_HoverMove_B_F_Add",
+                      "threshold": 0,
+                      "position": { "x": 0, "y": 1 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_Flight_HoverMove_B_L_Add",
+                      "threshold": 0.25,
+                      "position": { "x": -1, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_Flight_HoverMove_B_B_Add",
+                      "threshold": 0.5,
+                      "position": { "x": 0, "y": -1 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_Flight_HoverMove_B_R_Add",
+                      "threshold": 0.75,
+                      "position": { "x": 1, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    },
+                    {
+                      "motionType": "AnimationClip",
+                      "motionName": "A_Flight_HoverMove_A",
+                      "threshold": 1,
+                      "position": { "x": 0, "y": 0 },
+                      "timeScale": 1,
+                      "mirror": false,
+                      "cycleOffset": 0,
+                      "directBlendParameter": "MoveX"
+                    }
+                  ]
+                },
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Hover Blend",
+                    "isExitTransition": true,
+                    "hasExitTime": false,
+                    "exitTime": 1.57337148E-08,
+                    "hasFixedDuration": true,
+                    "duration": 0.18745409,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "IsHovering",
+                        "mode": "IfNot",
+                        "threshold": 0
+                      }
+                    ]
+                  },
+                  {
+                    "sourceState": "Hover Blend",
+                    "destinationState": "Light Land",
+                    "isExitTransition": false,
+                    "hasExitTime": false,
+                    "exitTime": 0.4140625,
+                    "hasFixedDuration": true,
+                    "duration": 0.25,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "IsHovering",
+                        "mode": "IfNot",
+                        "threshold": 0
+                      },
+                      {
+                        "parameter": "IsGrounded",
+                        "mode": "If",
+                        "threshold": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Hover Start",
+                "motionType": "AnimationClip",
+                "motionName": "A_Flight_Hover_Start_B",
+                "speed": 2,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Hover Start",
+                    "destinationState": "Hover Blend",
+                    "isExitTransition": false,
+                    "hasExitTime": true,
+                    "exitTime": 0,
+                    "hasFixedDuration": true,
+                    "duration": 0.424229622,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Jump Machine",
+            "defaultStateName": "Jump",
+            "parentStateMachineName": "Movement",
+            "states": [
+              {
+                "name": "Fall",
+                "motionType": "AnimationClip",
+                "motionName": "TwinSword_Jump_Loop",
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Fall",
+                    "isExitTransition": true,
+                    "hasExitTime": false,
+                    "exitTime": 2.11325002E-09,
+                    "hasFixedDuration": true,
+                    "duration": 0.141010121,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "FlightStart",
+                        "mode": "If",
+                        "threshold": 0
+                      }
+                    ]
+                  },
+                  {
+                    "sourceState": "Fall",
+                    "destinationState": "Fall",
+                    "isExitTransition": false,
+                    "hasExitTime": true,
+                    "exitTime": 0.6875,
+                    "hasFixedDuration": true,
+                    "duration": 0.25,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false
+                  },
+                  {
+                    "sourceState": "Fall",
+                    "destinationState": "Heavy Land",
+                    "isExitTransition": false,
+                    "hasExitTime": false,
+                    "exitTime": 2.18705853E-09,
+                    "hasFixedDuration": true,
+                    "duration": 0.286422461,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "HeavyLanding",
+                        "mode": "If",
+                        "threshold": 0
+                      }
+                    ]
+                  },
+                  {
+                    "sourceState": "Fall",
+                    "destinationState": "Light Land",
+                    "isExitTransition": false,
+                    "hasExitTime": false,
+                    "exitTime": 0.00407331716,
+                    "hasFixedDuration": true,
+                    "duration": 0.0863545686,
+                    "offset": 0.00425041933,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "LightLanding",
+                        "mode": "If",
+                        "threshold": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Heavy Land",
+                "motionType": "AnimationClip",
+                "motionName": "A_SuperheroLanding_C",
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Heavy Land",
+                    "destinationState": "Movement",
+                    "isExitTransition": false,
+                    "hasExitTime": false,
+                    "exitTime": 1.86264515E-09,
+                    "hasFixedDuration": true,
+                    "duration": 0.426017195,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "IsGrounded",
+                        "mode": "IfNot",
+                        "threshold": 0
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "Jump",
+                "motionType": "AnimationClip",
+                "motionName": "TwinSword_Jump_Start",
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Jump",
+                    "isExitTransition": true,
+                    "hasExitTime": false,
+                    "exitTime": 0,
+                    "hasFixedDuration": true,
+                    "duration": 0.379780084,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "FlightStart",
+                        "mode": "If",
+                        "threshold": 0
+                      }
+                    ]
+                  },
+                  {
+                    "sourceState": "Jump",
+                    "destinationState": "Fall",
+                    "isExitTransition": false,
+                    "hasExitTime": true,
+                    "exitTime": 0,
+                    "hasFixedDuration": true,
+                    "duration": 0.312416106,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false
+                  }
+                ]
+              },
+              {
+                "name": "Light Land",
+                "motionType": "AnimationClip",
+                "motionName": "TwinSword_Jump_End",
+                "speed": 1,
+                "speedParameterActive": false,
+                "mirror": false,
+                "mirrorParameterActive": false,
+                "cycleOffset": 0,
+                "cycleOffsetParameterActive": false,
+                "footIK": false,
+                "writeDefaults": true,
+                "transitions": [
+                  {
+                    "sourceState": "Light Land",
+                    "destinationState": "Movement",
+                    "isExitTransition": false,
+                    "hasExitTime": false,
+                    "exitTime": 0,
+                    "hasFixedDuration": true,
+                    "duration": 0.184706986,
+                    "offset": 0,
+                    "interruptionSource": "None",
+                    "orderedInterruption": true,
+                    "canTransitionToSelf": true,
+                    "solo": false,
+                    "mute": false,
+                    "conditions": [
+                      {
+                        "parameter": "IsGrounded",
+                        "mode": "IfNot",
+                        "threshold": 0
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "entryTransitions": [
+              {
+                "sourceState": "Entry",
+                "destinationState": "Jump",
+                "isExitTransition": false,
+                "hasExitTime": false,
+                "exitTime": 0,
+                "hasFixedDuration": true,
+                "duration": 0,
+                "offset": 0,
+                "interruptionSource": "None",
+                "orderedInterruption": true,
+                "canTransitionToSelf": false,
+                "solo": false,
+                "mute": false
+              }
+            ]
+          }
+        ],
+        "anyStateTransitions": [
+          {
+            "sourceState": "Any State",
+            "destinationState": "Hover Start",
+            "isExitTransition": false,
+            "hasExitTime": false,
+            "exitTime": 1.1441541E-08,
+            "hasFixedDuration": true,
+            "duration": 0.460976034,
+            "offset": 0,
+            "interruptionSource": "None",
+            "orderedInterruption": true,
+            "canTransitionToSelf": true,
+            "solo": false,
+            "mute": false,
+            "conditions": [
+              {
+                "parameter": "HoverStart",
+                "mode": "If",
+                "threshold": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Aim",
+      "weight": 0,
+      "blendingMode": "Override",
+      "avatarMask": "SK_Torso",
+      "iKPass": false,
+      "stateMachine": {
+        "name": "Aim",
+        "defaultStateName": "Aim Blend Tree",
+        "states": [
+          {
+            "name": "Aim Blend Tree",
+            "motionType": "BlendTree",
+            "motionName": "Blend Tree",
+            "blendTree": {
+              "name": "Blend Tree",
+              "blendType": "FreeformDirectional2D",
+              "blendParameter": "AimWalkX",
+              "blendParameterY": "AimWalkY",
+              "useAutomaticThresholds": true,
+              "minThreshold": 0,
+              "maxThreshold": 1,
+              "children": [
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_WalkFwd_Aim",
+                  "threshold": 0,
+                  "position": { "x": 0, "y": 1 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_WalkRight_Aim",
+                  "threshold": 0.166666672,
+                  "position": { "x": 0.5, "y": 0.5 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_WalkLeft_Aim",
+                  "threshold": 0.333333343,
+                  "position": { "x": -0.5, "y": 0.5 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_WalkBwd_Aim",
+                  "threshold": 0.5,
+                  "position": { "x": 0, "y": -1 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_WalkRight_Aim",
+                  "threshold": 0.666666687,
+                  "position": { "x": 0.5, "y": -0.5 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_WalkLeft_Aim",
+                  "threshold": 0.833333313,
+                  "position": { "x": -0.5, "y": -0.5 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                },
+                {
+                  "motionType": "AnimationClip",
+                  "motionName": "AS_Rifle_Aim",
+                  "threshold": 1,
+                  "position": { "x": 0, "y": 0 },
+                  "timeScale": 1,
+                  "mirror": false,
+                  "cycleOffset": 0,
+                  "directBlendParameter": "MoveX"
+                }
+              ]
+            },
+            "speed": 1,
+            "speedParameterActive": false,
+            "mirror": false,
+            "mirrorParameterActive": false,
+            "cycleOffset": 0,
+            "cycleOffsetParameterActive": false,
+            "footIK": false,
+            "writeDefaults": true
+          }
+        ]
+      }
+    }
+  ]
+}
