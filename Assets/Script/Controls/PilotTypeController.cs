@@ -172,6 +172,53 @@ public class PilotTypeController : MonoBehaviour
         currentState?.FixedTick();
     }
 
+    /// <summary>
+    /// POST-ANIMATION PLATFORM CORRECTION
+    ///
+    /// The platform (mech) moves via bone transforms which are evaluated during
+    /// Unity's animation phase — AFTER Update but BEFORE LateUpdate.
+    /// By the time LateUpdate runs the platform has already moved, but the player
+    /// (whose movement ran in Update) hasn't followed yet.  Cinemachine reads the
+    /// player position in LateUpdate, so it sees the player lagging one frame
+    /// behind the platform → visible as camera jitter in the Game view.
+    ///
+    /// This LateUpdate re-syncs the player to the platform's NOW-UPDATED
+    /// transform before Cinemachine processes, eliminating the jitter.
+    /// </summary>
+    void LateUpdate()
+    {
+        if (platformHandler.IsOnPlatform && isGrounded)
+        {
+            // --- Yaw correction ---
+            float yawCorrection = platformHandler.GetCorrectedYawDelta(transform);
+            if (Mathf.Abs(yawCorrection) > 0.001f)
+            {
+                transform.Rotate(0f, yawCorrection, 0f, Space.World);
+            }
+
+            // --- Position correction ---
+            Vector3 targetPos = platformHandler.GetCorrectedWorldPosition();
+            Vector3 correction = targetPos - transform.position;
+
+            if (correction.sqrMagnitude > 0.00001f)
+            {
+                controller.Move(correction);
+            }
+
+            // Re-record local space so next frame's Update delta is near-zero
+            // (only the platform movement between this LateUpdate and next Update
+            //  would show up, which is essentially nothing).
+            platformHandler.UpdateAfterMove(transform);
+        }
+
+        // Mesh root correction for flight (prevents animation root motion jitter)
+        if (meshRoot != null && currentState == FlightPilotState)
+        {
+            meshRoot.localPosition = Vector3.zero;
+            meshRoot.localRotation = Quaternion.identity;
+        }
+    }
+
     void ReadInput()
     {
         moveInput = input.PlayerA.Move.ReadValue<Vector2>();

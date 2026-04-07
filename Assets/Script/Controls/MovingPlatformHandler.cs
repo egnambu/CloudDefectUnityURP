@@ -95,6 +95,32 @@ namespace MadeInJupiter.Controls
         }
 
         /// <summary>
+        /// Returns the world-space position the player should occupy based on
+        /// the platform's CURRENT transform and the stored local-space anchor.
+        /// Call in LateUpdate (after animation has moved the platform bones)
+        /// to obtain a post-animation correction target.
+        /// </summary>
+        public Vector3 GetCorrectedWorldPosition()
+        {
+            if (_platform == null) return Vector3.zero;
+            return _platform.TransformPoint(_localPosition);
+        }
+
+        /// <summary>
+        /// Returns the yaw delta (degrees) between the player's current yaw and
+        /// where the platform's rotation says it should be.  Call in LateUpdate
+        /// for post-animation yaw correction.
+        /// </summary>
+        public float GetCorrectedYawDelta(Transform playerTransform)
+        {
+            if (_platform == null) return 0f;
+            Quaternion targetWorldRot = _platform.rotation * _localRotation;
+            float targetYaw = targetWorldRot.eulerAngles.y;
+            float currentYaw = playerTransform.eulerAngles.y;
+            return Mathf.DeltaAngle(currentYaw, targetYaw);
+        }
+
+        /// <summary>
         /// Forget the current platform. Call this when leaving the ground.
         /// </summary>
         public void ClearPlatform()
